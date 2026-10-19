@@ -13,4 +13,11 @@ export class DailyLimiter {
     this.counts.set(k, n + 1);
     return true;
   }
+  /** 归还一次额度：上游（模型）失败时用户什么都没拿到，不应占掉当天的名额。 */
+  refund(uid, route) {
+    if (this._today() !== this.day) return; // 已跨天，计数已清零
+    const k = `${uid}:${route}`;
+    const n = this.counts.get(k) ?? 0;
+    if (n > 0) this.counts.set(k, n - 1);
+  }
 }

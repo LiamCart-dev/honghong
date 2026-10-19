@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../../data/db/app_database.dart';
 import '../../data/repositories/diary_repository.dart';
@@ -14,6 +15,11 @@ const summaryHour = 21;
 
 /// 失败最多重试 3 次（架构 §5.3）
 const summaryMaxAttempts = 3;
+
+/// 自动重试的最短间隔（同一进程内）。首页、日记页、回到前台会连续触发 `trigger`，
+/// 不加间隔的话 3 次机会会在一分钟内用光（网关还在抖动时必然全部失败），
+/// 网关当天 3 次的限额也一起被耗尽，之后“点此重试”只会拿到 429。
+const summaryRetryCooldown = Duration(minutes: 10);
 
 DateTime _d(DateTime t) => DateTime(t.year, t.month, t.day);
 String _ymd(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
@@ -37,6 +43,9 @@ class SummaryService {
 
   /// 同一进程里同一 (宝宝, 日期) 只允许一个生成在跑：首页和日记页同时触发时只发一次请求
   static final _inflight = <String, Future<DailySummary?>>{};
+
+  /// 每个 (宝宝, 日期) 最近一次失败的时间；自动重试要等满 [summaryRetryCooldown]，手动重试不受限
+  final _lastFailedAt = <String, DateTime>{};
 
   /// 触发点（回到前台、打开首页、打开日记页）调用。返回今天（或刚补的昨天）的小结状态。
   Future<void> trigger(String babyId, DateTime birthDate) async {
@@ -82,6 +91,9 @@ class SummaryService {
     if (existing != null && !ok(existing)) return existing;
     final row = existing ?? await _repo.claimSummary(babyId, day, promptVersion: promptVersion);
     if (!ok(row)) return row;
+    final key = '$babyId:${_ymd(day)}';
+    final lastFail = _lastFailedAt[key];
+    if (!manual && row.status == 'failed' && lastFail != null && now().difference(lastFail) < summaryRetryCooldown) return row;
     final s = await statsOf(babyId, day);
     if (s.isEmpty) {
       await _repo.updateSummary(row.id, DailySummariesCompanion(status: const Value('empty'), generatedAt: Value(now())));
@@ -107,7 +119,11 @@ class SummaryService {
             generatedAt: Value(now()),
             attempts: Value(row.attempts + 1),
           ));
-    } on DiaryApiException {
+      _lastFailedAt.remove(key);
+    } on DiaryApiException catch (e) {
+      // 失败原因只在调试日志里留一份（不含用户内容），界面仍按架构 §5.3 不显示错误细节
+      debugPrint('summary ${_ymd(day)} failed (attempt ${row.attempts + 1}${manual ? ', manual' : ''}): $e');
+      _lastFailedAt[key] = now();
       await _repo.updateSummary(row.id, DailySummariesCompanion(status: const Value('failed'), attempts: Value(row.attempts + 1)));
     }
     return _repo.summaryOf(babyId, day);

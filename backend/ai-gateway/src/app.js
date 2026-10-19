@@ -120,6 +120,9 @@ export function createHandler(cfg, {
       }
       if (!limiter.take(claims.sub, path)) return done(429, { error: 'rate_limited' });
       const [code, out] = await handler(body, claims, meta);
+      // 小结每天只有 3 次额度：模型 5xx/超时时用户没拿到小结，不能占额度，
+      // 否则客户端连续失败 3 次后，“点此重试”当天只会得到 429（4xx 参数错误仍然计数）
+      if (code >= 500 && path === 'diary-summary') limiter.refund?.(claims.sub, path);
       return done(code, out);
     } catch (e) {
       // 记录异常类型和代码位置，不记 message（可能含用户文本）

@@ -73,6 +73,9 @@ class SummaryPage extends ConsumerWidget {
         const _Big('小结暂时没生成好', key: Key('sum-failed')),
         HhButton(key: const Key('sum-retry'), label: '点此重试', onPressed: () => ref.read(summaryTriggerProvider).retry(day)),
         const SizedBox(height: 12),
+        // 首页入口卡在小结失败时会直达本页；记录入口不能因此被锁死
+        HhButton(key: const Key('sum-add'), label: '补记一句', primary: false, onPressed: () => context.push(Routes.diary)),
+        const SizedBox(height: 12),
         HhButton(key: const Key('sum-day'), label: isToday ? '看今天的日记' : '看这天的日记', primary: false, onPressed: goDay),
       ]);
     } else {
