@@ -99,8 +99,9 @@ class CloudVoiceCapture implements VoiceCapture {
         _ => errCode('ws_${e.runtimeType}'),
       };
 
+  /// [onError] 云端已是最后一级兜底，没有可切换的目标，这里不使用；失败走 [failed] / stop 的返回值。
   @override
-  Future<bool> start({required void Function(String partial) onPartial, void Function(double level)? onLevel}) async {
+  Future<bool> start({required void Function(String partial) onPartial, void Function(double level)? onLevel, void Function()? onError}) async {
     _text = '';
     _failed = false;
     _code = null;

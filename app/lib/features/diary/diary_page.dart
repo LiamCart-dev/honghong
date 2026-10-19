@@ -22,9 +22,13 @@ import '../../services/diary/diary_metrics.dart';
 import 'diary_sheets.dart';
 import 'diary_widgets.dart';
 import '../../services/diary/voice_capture.dart';
+import '../../services/audio/auto_listen.dart';
 import '../../core/app_clock.dart';
 
 enum MicState { idle, recording, cancelZone, processing }
+
+/// 启动/切换识别期间收到的指针事件：先记下，启动结束后再统一处理
+enum _Pending { none, release, abandon }
 
 /// 妈咪日记主页（设计稿 3–9、16 的提示条）
 class DiaryPage extends ConsumerStatefulWidget {
@@ -40,7 +44,14 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
   Duration elapsed = Duration.zero;
   Timer? _tick;
   Offset? _down;
-  bool _starting = false;
+  /// 正在启动或切换识别；期间的松手/取消先记下（[_pending]），不直接处理
+  bool _busy = false;
+  _Pending _pending = _Pending.none;
+
+  /// 日记页进入时暂停首页自动听哭（照抄哭声录音页），离开时恢复
+  late final AutoListenController _auto;
+  bool _autoPaused = false;
+  Future<void> _autoPausing = Future.value();
 
   /// 本机识别这次打开里已经失败/不可用过：之后（已同意时）直接走联网识别
   bool _systemBroken = false;
@@ -54,6 +65,11 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
   @override
   void initState() {
     super.initState();
+    _auto = ref.read(autoListenControllerProvider.notifier);
+    if (AutoListenController.enabledInThisEnv) {
+      _autoPaused = true;
+      _autoPausing = _auto.pause();
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _maybeAskGender();
       ref.read(summaryTriggerProvider).kick();
@@ -63,7 +79,8 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
   @override
   void dispose() {
     _tick?.cancel();
-    if (mic == MicState.recording || mic == MicState.cancelZone) (_capture ?? ref.read(voiceCaptureProvider))!.cancel();
+    if (mic == MicState.recording || mic == MicState.cancelZone) _capture?.cancel();
+    if (_autoPaused) _auto.resume();
     super.dispose();
   }
 
@@ -85,9 +102,9 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
 
   // ── 按住说话 ──
   Future<void> _pressDown(Offset pos) async {
-    if (mic != MicState.idle || _starting) return;
-    _starting = true;
+    if (mic != MicState.idle || _busy) return;
     _down = pos;
+    _pending = _Pending.none;
     setState(() {
       mic = MicState.recording;
       live = '';
@@ -97,21 +114,109 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
     _tick = Timer.periodic(const Duration(milliseconds: 200), (_) {
       if (mounted && _startedAt != null) setState(() => elapsed = _now().difference(_startedAt!));
     });
+    await _busyRun(_startPress);
+  }
+
+  /// 启动识别。本机失败且已同意联网时，同一次按住切到讯飞（不要求松手再按）。
+  Future<void> _startPress() async {
+    await _autoPausing;
     final cloud = ref.read(cloudVoiceCaptureProvider);
     final useCloud = _systemBroken && cloud != null && _consent == true;
     final VoiceCapture cap = useCloud ? cloud : ref.read(voiceCaptureProvider);
     _capture = cap;
-    final ok = await cap.start(onPartial: (t) {
-      if (mounted) setState(() => live = t);
-    });
-    _starting = false;
-    if (!ok) _report(cap, 'voice.asr.start', 'fail');
-    if (!ok && mounted) {
-      _reset();
-      _metric(DiaryMetric.voice);
-      _metric(DiaryMetric.voiceFail);
-      await _recognizerFailed(cap);
+    final ok = await _startCapture(cap);
+    if (!mounted) return _cancelQuietly(cap);
+    // 启动期间就已报错（如离线语言不可用）等同于启动失败
+    if (ok && !cap.failed) return;
+    if (await _fallbackToCloud(cap)) return;
+    await _failPress(_capture ?? cap);
+  }
+
+  Future<bool> _startCapture(VoiceCapture cap) => cap.start(
+        onPartial: (t) {
+          if (mounted) setState(() => live = t);
+        },
+        onError: () => _onCaptureError(cap),
+      );
+
+  /// 按住期间引擎报错（非启动阶段）：已同意联网则当场切到讯飞，同一次按住继续。
+  void _onCaptureError(VoiceCapture cap) {
+    if (!mounted || _busy || !identical(cap, _capture)) return;
+    if (mic != MicState.recording && mic != MicState.cancelZone) return;
+    final cloud = ref.read(cloudVoiceCaptureProvider);
+    // 未同意或没有联网识别：保持原样，松手后走告知/屏 9 流程
+    if (_consent != true || cloud == null || identical(cap, cloud)) return;
+    unawaited(_busyRun(() async {
+      if (await _fallbackToCloud(cap)) return;
+      await _failPress(_capture ?? cap);
+    }));
+  }
+
+  /// 本机失败、已同意联网：切到讯飞并继续本次按住。返回 false 表示没切换（未同意/无讯飞/讯飞也没起来）。
+  Future<bool> _fallbackToCloud(VoiceCapture from) async {
+    final cloud = ref.read(cloudVoiceCaptureProvider);
+    if (cloud == null || identical(from, cloud) || _consent != true) return false;
+    _report(from, 'voice.fallback_to_cloud', null);
+    _systemBroken = true;
+    ref.read(systemAsrBrokenProvider.notifier).mark();
+    await _cancelQuietly(from);
+    _capture = cloud;
+    final ok = await _startCapture(cloud);
+    if (!mounted) {
+      if (ok) await _cancelQuietly(cloud);
+      return false;
     }
+    if (ok) _snack('本机识别不可用，已换成联网识别，请接着说');
+    return ok;
+  }
+
+  /// 这次按住彻底失败：记统计、收起识别、进入失败兜底（告知 / 屏 9）
+  Future<void> _failPress(VoiceCapture cap) async {
+    if (!mounted) return;
+    _report(cap, 'voice.asr.start', 'fail');
+    _metric(DiaryMetric.voice);
+    _metric(DiaryMetric.voiceFail);
+    await _cancelQuietly(cap);
+    _reset();
+    await _recognizerFailed(cap);
+  }
+
+  /// 启动/切换期间的动作结束后，处理期间记下的松手或取消
+  Future<void> _busyRun(Future<void> Function() body) async {
+    _busy = true;
+    try {
+      await body();
+    } finally {
+      _busy = false;
+    }
+    final p = _pending;
+    _pending = _Pending.none;
+    if (!mounted) return;
+    if (p == _Pending.release) await _release();
+    if (p == _Pending.abandon) await _abandonPress();
+  }
+
+  /// 启动期间被系统打断（如首次权限弹窗）：放弃这次按住，不当成正常松手
+  Future<void> _cancelByPointer() async {
+    if (_busy) {
+      _pending = _Pending.abandon;
+      return;
+    }
+    await _release();
+  }
+
+  Future<void> _abandonPress() async {
+    if (mic != MicState.recording && mic != MicState.cancelZone) return;
+    await _cancelQuietly(_capture);
+    _reset();
+    _snack('已取消，请再按住说一次');
+  }
+
+  Future<void> _cancelQuietly(VoiceCapture? cap) async {
+    if (cap == null) return;
+    try {
+      await cap.cancel();
+    } catch (_) {} // 未启动成功时取消不应抛出
   }
 
   void _move(Offset pos) {
@@ -122,6 +227,10 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
   }
 
   Future<void> _release() async {
+    if (_busy) {
+      if (_pending == _Pending.none) _pending = _Pending.release;
+      return;
+    }
     final VoiceCapture voice = _capture ?? ref.read(voiceCaptureProvider);
     final started = _startedAt;
     if (mic == MicState.cancelZone) {
@@ -179,12 +288,10 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
 
   bool? get _consent => ref.read(cloudAsrConsentProvider);
 
-  /// 识别引擎不可用/出错：本机的 → 联网识别兜底（首次先告知）；联网的 → 屏 9。
+  /// 这次按住已结束仍失败（松手时才发现）：本机的 → 未问过则告知，已同意则下次直接联网；联网的 / 不用 → 屏 9。
   Future<void> _recognizerFailed(VoiceCapture cap) async {
     final cloud = ref.read(cloudVoiceCaptureProvider);
     if (identical(cap, cloud) || cloud == null) return _voiceFailed();
-    if (_consent != false) _report(cap, 'voice.fallback_to_cloud', null);
-    final firstSwitch = !_systemBroken;
     _systemBroken = true;
     ref.read(systemAsrBrokenProvider.notifier).mark();
     switch (_consent) {
@@ -199,11 +306,7 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
           await _openText();
         }
       case true:
-        if (firstSwitch) {
-          _snack('本机识别不可用，已换成联网识别，请再说一次');
-        } else {
-          await _voiceFailed();
-        }
+        _snack('本机识别不可用，已换成联网识别，请再按住说一次');
       case false:
         await _voiceFailed();
     }
@@ -269,6 +372,7 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
               onDown: _pressDown,
               onMove: _move,
               onUp: _release,
+              onCancel: _cancelByPointer,
             ),
             if (mic == MicState.idle) _AltButton(onTap: () => _openText()),
             const SizedBox(height: 14),
@@ -281,12 +385,12 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
 }
 
 class _MicArea extends StatelessWidget {
-  const _MicArea({required this.state, required this.live, required this.elapsed, required this.onDown, required this.onMove, required this.onUp});
+  const _MicArea({required this.state, required this.live, required this.elapsed, required this.onDown, required this.onMove, required this.onUp, required this.onCancel});
   final MicState state;
   final String live;
   final Duration elapsed;
   final void Function(Offset) onDown, onMove;
-  final VoidCallback onUp;
+  final VoidCallback onUp, onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -339,7 +443,7 @@ class _MicArea extends StatelessWidget {
       onPointerDown: (e) => onDown(e.position),
       onPointerMove: (e) => onMove(e.position),
       onPointerUp: (_) => onUp(),
-      onPointerCancel: (_) => onUp(),
+      onPointerCancel: (_) => onCancel(),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         width: size,
