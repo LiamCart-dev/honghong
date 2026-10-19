@@ -2,7 +2,6 @@
 app/.dart_tool/
 app/build/
 app/.flutter-plugins*
-app/pubspec.lock
 *.g.dart
 # Python
 __pycache__/

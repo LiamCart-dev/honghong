@@ -93,3 +93,9 @@ flutter_launcher_icons:
   adaptive_icon_background: "#FFF8F0"
   adaptive_icon_foreground: assets/brand/adaptive-foreground.png
   min_sdk_android: 21
+
+# 固定 shared_preferences_android：2.5.0 在 release 构建启动时报
+# NoSuchMethodError（SharedPreferencesApiRegistrar.getAll），本地存储读不到导致启动黑屏。
+# 升级前须真机验证（见 docs/release.md）。
+dependency_overrides:
+  shared_preferences_android: 2.4.28

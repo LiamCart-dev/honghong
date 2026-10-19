@@ -62,6 +62,9 @@
    - 把 `version.json` 也上传到滚动 Release `latest`；
    - 删除上传分支。
 
+依赖版本由 `app/pubspec.lock` 锁定（已提交），CI 用 `flutter pub get --enforce-lockfile`，不会自动解析到新版本。`app/pubspec.yaml` 的 `dependency_overrides` 当前固定 `shared_preferences_android: 2.4.28`（2.5.0 release 启动报 NoSuchMethodError，中兴 A2021 黑屏）。
+升级依赖必须显式改 lock（`flutter pub upgrade <包名>` 或改 pubspec 后 `flutter pub get`），提交前真机启动验证，不要在发布时隐式升级。
+
 为什么分两个仓库：源码仓库私有，安装包和 version.json 放公开仓库，App 不需要任何令牌就能下载。
 
 ### 签名与密钥（只写名字，不写内容）
