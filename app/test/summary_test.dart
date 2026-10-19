@@ -91,6 +91,41 @@ void main() {
       expect(api.summaryCalls, hasLength(3));
     });
 
+    test('连续触发（首页→日记页→回前台）不会一分钟内用光 3 次机会；间隔够了才自动重试，网关恢复后能自愈', () async {
+      await seedDay(db);
+      t = at(21, 10);
+      api.error = const DiaryApiException(DiaryApiError.failed, '502');
+      final s = svc(); // 同一个实例：和 App 里常驻的 summaryServiceProvider 一样
+      for (var i = 0; i < 5; i++) {
+        await s.trigger('b', DateTime(2026, 8, 15));
+      }
+      expect(api.summaryCalls.where((c) => c.startsWith('2026-10-14')), hasLength(1));
+      expect((await row(day))!.attempts, 1);
+      expect(SummaryService.needsManualRetry(await row(day)), isFalse);
+
+      t = at(21, 10).add(summaryRetryCooldown); // 间隔够了：再试一次，仍失败
+      await s.trigger('b', DateTime(2026, 8, 15));
+      expect((await row(day))!.attempts, 2);
+
+      api.error = null; // 网关恢复
+      t = t.add(summaryRetryCooldown);
+      await s.trigger('b', DateTime(2026, 8, 15));
+      final r = (await row(day))!;
+      expect(r.status, 'ready');
+      expect(r.content, api.summaryText);
+    });
+
+    test('手动重试不受间隔限制', () async {
+      await seedDay(db);
+      t = at(21, 10);
+      api.error = const DiaryApiException(DiaryApiError.failed, '502');
+      final s = svc();
+      await s.ensure('b', day, DateTime(2026, 8, 15));
+      api.error = null;
+      await s.retry('b', day, DateTime(2026, 8, 15));
+      expect((await row(day))!.status, 'ready');
+    });
+
     test('ready 后再触发、再加记录也不改写', () async {
       await seedDay(db);
       t = at(21);
@@ -278,6 +313,17 @@ void main() {
       GoRouter.of(tester.element(find.byType(Scaffold).last)).pop();
       await settle(tester, 10);
       expect(find.text('今日小结已生成 · 点开看看'), findsOneWidget);
+      await unmount(tester);
+    });
+
+    testWidgets('失败满 3 次：小结页仍能“补记一句”进入记录页，不会被锁死', (tester) async {
+      await boot(tester, failed3: true);
+      await openFromHome(tester); // 入口卡直达小结页（失败态）
+      expect(find.byKey(const Key('sum-failed')), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('sum-add')));
+      await tester.tap(find.byKey(const Key('sum-add')));
+      await settle(tester, 10);
+      expect(find.byKey(const Key('diary-mic')), findsOneWidget);
       await unmount(tester);
     });
 

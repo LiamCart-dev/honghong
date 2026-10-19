@@ -42,6 +42,27 @@ test('diary-summary 参数校验', async () => {
   });
 });
 
+test('diary-summary：模型失败（502/503）不占当天 3 次额度，恢复后手动重试能成功', async () => {
+  const llm = fakeLlm([new LlmError('llm_timeout'), new LlmError('llm_http', 'llm_http_402'), new LlmError('llm_network'), JSON.stringify({ content: '今天记录了4次喂奶' })]);
+  await serve({ log: () => {}, llm }, async (b) => {
+    for (let i = 0; i < 3; i++) {
+      const r = await post(b, '/diary-summary', SUM);
+      assert.equal(r.status, 502);
+    }
+    const ok = await post(b, '/diary-summary', SUM); // 第 4 次：模型恢复，不能被 429 挡住
+    assert.equal(ok.status, 200);
+    assert.equal((await ok.json()).content, '今天记录了4次喂奶');
+  }, { limits: { 'diary-summary': 3, 'diary-parse': 60 } });
+});
+
+test('diary-summary：参数错误（400）仍占额度，成功后额度用完返回 429', async () => {
+  await serve({ log: () => {}, llm: fakeLlm([JSON.stringify({ content: '今天记录了4次喂奶' })]) }, async (b) => {
+    assert.equal((await post(b, '/diary-summary', { ...SUM, date: 'x' })).status, 400);
+    assert.equal((await post(b, '/diary-summary', SUM)).status, 200);
+    assert.equal((await post(b, '/diary-summary', { ...SUM, idempotency_key: 's-2' })).status, 429);
+  }, { limits: { 'diary-summary': 2, 'diary-parse': 60 } });
+});
+
 test('parse 失败与上游故障的状态码', async () => {
   await serve({ log: () => {}, llm: fakeLlm(['nope']) }, async (b) => {
     const r = await post(b, '/diary-parse', PARSE);
