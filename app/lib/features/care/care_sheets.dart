@@ -96,11 +96,6 @@ class _SessionEndSheetState extends State<SessionEndSheet> {
       CareLogType.sleep => '醒来了吗?',
       _ => widget.editing ? '可修改' : '计时已写入，可改',
     };
-    final resumeLabel = switch (type) {
-      CareLogType.feed => '继续喂',
-      CareLogType.sleep => '还在睡',
-      _ => '继续拍',
-    };
     Widget label(String s) => Padding(
           padding: const EdgeInsets.only(top: 18, bottom: 10),
           child: Text(s, style: TextStyle(fontSize: 13, color: c.sub)),
@@ -185,7 +180,7 @@ class _SessionEndSheetState extends State<SessionEndSheet> {
             Expanded(
               flex: 9,
               child: HhButton(
-                label: widget.editing ? '取消' : resumeLabel,
+                label: '取消',
                 primary: false,
                 onPressed: () => Navigator.pop(context, widget.editing ? null : const SessionEndResult.resume()),
               ),
@@ -199,7 +194,7 @@ class _SessionEndSheetState extends State<SessionEndSheet> {
           if (!widget.editing)
             Padding(
               padding: const EdgeInsets.only(top: 12),
-              child: Center(child: Text('关掉面板等于"${resumeLabel.replaceAll('还在', '继续')}"，不会丢计时。', style: TextStyle(fontSize: 12, color: c.sub))),
+              child: Center(child: Text('点“取消”或关掉面板：计时继续，不写入记录。', style: TextStyle(fontSize: 12, color: c.sub))),
             ),
         ],
       ),
