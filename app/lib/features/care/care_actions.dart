@@ -26,7 +26,7 @@ class CareActions {
     final previous = await _previousDetail(log);
     if (!context.mounted) return;
     final result = await showSessionEndSheet(context, log, stoppedAt, previous: previous);
-    // "继续"或直接关掉面板：回到进行中，避免误结束
+    // "取消"或直接关掉面板：回到进行中，不写入新记录，避免误结束
     if (result == null || result.resume) {
       await repo.resumeSession(log.id);
       return;

@@ -32,8 +32,8 @@ void main() {
     expect(find.text('喂奶结束'), findsOneWidget);
     expect(find.textContaining('已停止计时', findRichText: true), findsOneWidget);
 
-    // 继续喂 → 回到进行中
-    await tester.tap(find.text('继续喂'));
+    // 取消 → 回到进行中
+    await tester.tap(find.text('取消'));
     await settle(tester, 10);
     expect(find.byKey(const Key('running-feed')), findsOneWidget);
 
@@ -53,6 +53,31 @@ void main() {
     final logs = await tester.runAsync(() => CareLogRepository(db).all());
     expect(logs!.single.endedAt, isNotNull);
     expect(CareDetail.decode(logs.single.detail).side, FeedSide.right);
+    await unmount(tester);
+    await tester.runAsync(db.close);
+  });
+
+  testWidgets('喂奶：结束后点取消 → 计时继续，不新增记录', (tester) async {
+    tester.view.physicalSize = const Size(390, 1100) * 3;
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final db = await pumpApp(tester);
+
+    await tester.tap(find.byKey(const Key('quick-feed')));
+    await settle(tester);
+    await tester.tap(find.byKey(const Key('end-feed')));
+    await settle(tester, 10);
+    expect(find.text('喂奶结束'), findsOneWidget);
+
+    await tester.tap(find.text('取消'));
+    await settle(tester, 10);
+    expect(find.text('喂奶结束'), findsNothing);
+    expect(find.byKey(const Key('running-feed')), findsOneWidget);
+    expect(find.text('已写入 · 可点条目修改'), findsNothing);
+
+    final logs = await tester.runAsync(() => CareLogRepository(db).all());
+    expect(logs!.length, 1);
+    expect(logs.single.endedAt, isNull);
     await unmount(tester);
     await tester.runAsync(db.close);
   });
