@@ -73,7 +73,9 @@ class _GenderSheetState extends State<_GenderSheet> {
 }
 
 /// 屏 9：语音识别失败兜底。返回 true=改用文字输入，false=再说一次。
-Future<bool?> showVoiceErrorSheet(BuildContext context) => showModalBottomSheet<bool>(
+/// [systemDown]：本机引擎本身不可用（不是没听清），文案不说“周围有点吵”。
+/// [cloudOff]：用户已关闭联网识别，提示可在设置里打开。
+Future<bool?> showVoiceErrorSheet(BuildContext context, {bool systemDown = false, bool cloudOff = false}) => showModalBottomSheet<bool>(
       context: context,
       useRootNavigator: true,
       useSafeArea: true,
@@ -87,7 +89,7 @@ Future<bool?> showVoiceErrorSheet(BuildContext context) => showModalBottomSheet<
             const SizedBox(height: 8),
             Text('没听清，再试一次？', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.ink)),
             const SizedBox(height: 6),
-            Text('周围有点吵，或者说得太快了。宝宝睡着时，也可以直接打字。',
+            Text(_voiceErrorBody(systemDown: systemDown, cloudOff: cloudOff),
                 textAlign: TextAlign.center, style: TextStyle(fontSize: 14, height: 1.5, color: c.sub)),
             const SizedBox(height: 18),
             HhButton(key: const Key('voice-err-text'), label: '改用文字输入', onPressed: () => Navigator.pop(ctx, true)),
@@ -97,6 +99,12 @@ Future<bool?> showVoiceErrorSheet(BuildContext context) => showModalBottomSheet<
         );
       },
     );
+
+String _voiceErrorBody({required bool systemDown, required bool cloudOff}) {
+  final reason = systemDown ? '这台手机自带的语音识别暂时用不了。' : '周围有点吵，或者说得太快了。';
+  final tip = cloudOff ? '也可以在设置中开启「联网语音识别」，本机识别不好用时自动改用讯飞。' : '宝宝睡着时，也可以直接打字。';
+  return '$reason$tip';
+}
 
 /// 联网识别告知（首次需要走讯飞时弹一次）。返回 true=同意，false=不同意（退回文字输入），null=关掉没选。
 Future<bool?> showCloudAsrConsentSheet(BuildContext context) => showModalBottomSheet<bool>(
