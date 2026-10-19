@@ -5,7 +5,8 @@ import 'package:speech_to_text/speech_to_text.dart';
 /// 没有或失败时、经用户同意后走讯飞联网识别（CloudVoiceCapture，D9 修订）。
 abstract class VoiceCapture {
   /// 开始识别。返回 false 表示不可用（无权限/不支持），界面走屏 9 兜底。
-  Future<bool> start({required void Function(String partial) onPartial, void Function(double level)? onLevel});
+  /// [onError]：会话中途引擎报错时回调（按住期间即可切换联网识别，不必松手）。
+  Future<bool> start({required void Function(String partial) onPartial, void Function(double level)? onLevel, void Function()? onError});
 
   /// 松手：结束并返回最终文本（可能为空）
   Future<String> stop();
@@ -40,6 +41,9 @@ class SystemVoiceCapture implements VoiceCapture {
   bool _error = false;
   String? _code;
 
+  /// initialize 只做一次，错误回调要指向当前这次 start 的回调，所以存成字段
+  void Function()? _onError;
+
   @override
   String? get errorCode => _code;
 
@@ -47,15 +51,17 @@ class SystemVoiceCapture implements VoiceCapture {
   String? get requestId => null;
 
   @override
-  Future<bool> start({required void Function(String partial) onPartial, void Function(double level)? onLevel}) async {
+  Future<bool> start({required void Function(String partial) onPartial, void Function(double level)? onLevel, void Function()? onError}) async {
     _text = '';
     _error = false;
     _code = null;
+    _onError = onError;
     try {
       _ready = _ready ||
           await _stt.initialize(onError: (SpeechRecognitionError e) {
             _error = true;
             _code = errCode('system_${e.errorMsg}'); // 例如 system_error_no_match / system_error_language_unavailable
+            _onError?.call();
           });
       if (!_ready) {
         _error = true;
@@ -95,7 +101,10 @@ class SystemVoiceCapture implements VoiceCapture {
 
   @override
   Future<void> cancel() async {
-    await _stt.cancel();
+    _onError = null;
+    try {
+      await _stt.cancel();
+    } catch (_) {} // 未初始化/已失败时取消不应抛出
     _text = '';
   }
 

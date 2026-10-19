@@ -177,32 +177,43 @@ void main() {
       await unmount(tester);
     });
 
-    testWidgets('已同意过：本机识别出错（空结果）后提示并改用联网识别，不再弹告知', (tester) async {
+    testWidgets('已同意过：按住期间本机识别报错 → 同一次按住切到联网识别，松手直接出结果', (tester) async {
       system = FakeVoice(ok: true, text: '');
       await open(tester, prefs: const {kDiaryGenderPrompted: true, kDiaryCloudAsrConsent: true});
-      system.failed = false;
-      // 本机返回空且标记出错
-      system.text = '';
       final g = await tester.startGesture(tester.getCenter(find.byKey(const Key('diary-mic'))));
       await settle(tester, 3);
-      system.failed = true;
+      system.fail(); // 引擎中途报错（如离线语言不可用）
+      await settle(tester, 3);
+      expect(find.byKey(const Key('cloud-asr-agree')), findsNothing);
+      expect(find.text('本机识别不可用，已换成联网识别，请接着说'), findsOneWidget);
       clock.t = clock.t.add(const Duration(seconds: 2));
       await g.up();
       await settle(tester, 10);
-      expect(find.byKey(const Key('cloud-asr-agree')), findsNothing);
-      expect(find.text('本机识别不可用，已换成联网识别，请再说一次'), findsOneWidget);
-      await tester.pump(const Duration(seconds: 3));
-      await hold(tester);
       expect(api.calls, ['voice:联网识别的一句话']);
+      expect(find.byKey(const Key('card-0')), findsOneWidget);
+      expect(system.cancels, 1); // 本机会话已收起
+      await unmount(tester);
+    });
+
+    testWidgets('已同意过：松手时本机才报告失败 → 提示下次改用联网识别，不再弹告知', (tester) async {
+      system = FakeVoice(ok: true, text: '');
+      await open(tester, prefs: const {kDiaryGenderPrompted: true, kDiaryCloudAsrConsent: true});
+      final g = await tester.startGesture(tester.getCenter(find.byKey(const Key('diary-mic'))));
+      await settle(tester, 3);
+      clock.t = clock.t.add(const Duration(seconds: 2));
+      system.failed = true; // 只在 stop 时才体现失败（无回调）
+      await g.up();
+      await settle(tester, 10);
+      expect(find.byKey(const Key('cloud-asr-agree')), findsNothing);
+      expect(find.text('本机识别不可用，已换成联网识别，请再按住说一次'), findsOneWidget);
+      expect(api.calls, isEmpty);
       await unmount(tester);
     });
 
     testWidgets('联网识别也失败 → 屏 9', (tester) async {
       cloud = FakeVoice(ok: false);
       await open(tester, prefs: const {kDiaryGenderPrompted: true, kDiaryCloudAsrConsent: true});
-      await hold(tester); // 本机不可用 → 提示切换
-      await tester.pump(const Duration(seconds: 3));
-      await hold(tester); // 联网也不行
+      await hold(tester); // 本机不可用 → 同一次按住切到联网，联网也不行 → 屏 9
       expect(find.byKey(const Key('voice-err-text')), findsOneWidget);
       await unmount(tester);
     });
@@ -254,7 +265,7 @@ void main() {
       await go(tester, Routes.diary);
       await hold(tester);
       expect(find.byKey(const Key('cloud-asr-agree')), findsNothing);
-      expect(find.text('本机识别不可用，已换成联网识别，请再说一次'), findsOneWidget);
+      expect(find.text('本机识别不可用，已换成联网识别，请接着说'), findsOneWidget);
       await unmount(tester);
     });
 

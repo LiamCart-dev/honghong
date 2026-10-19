@@ -48,12 +48,21 @@ class FakeVoice implements VoiceCapture {
   String? errorCode;
   @override
   String? get requestId => null;
+  void Function()? _onError;
   @override
-  Future<bool> start({required void Function(String partial) onPartial, void Function(double level)? onLevel}) async {
+  Future<bool> start({required void Function(String partial) onPartial, void Function(double level)? onLevel, void Function()? onError}) async {
     failed = !ok;
     errorCode = ok ? null : 'system_unavailable';
+    _onError = onError;
     if (ok) onPartial('刚才喂了');
     return ok;
+  }
+
+  /// 模拟按住期间引擎报错（speech_to_text 的 onError 回调）
+  void fail() {
+    failed = true;
+    errorCode = 'system_error_language_unavailable';
+    _onError?.call();
   }
 
   @override
