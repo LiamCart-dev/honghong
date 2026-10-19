@@ -256,7 +256,8 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
     if (!mounted) return;
     if (text.isEmpty) {
       _reset();
-      return voice.failed ? _recognizerFailed(voice) : _voiceFailed();
+      // 空结果不论引擎报没报错都按失败走兜底：否则 failed=false 会把人永远挡在讯飞外
+      return _recognizerFailed(voice);
     }
     setState(() => live = text);
     await _process(text, 'voice');
@@ -288,10 +289,19 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
 
   bool? get _consent => ref.read(cloudAsrConsentProvider);
 
-  /// 这次按住已结束仍失败（松手时才发现）：本机的 → 未问过则告知，已同意则下次直接联网；联网的 / 不用 → 屏 9。
+  /// 本机引擎自身不可用（初始化失败、离线语言缺失等），区别于“没听清”。文案据此区分，不让“周围有点吵”盖住它。
+  bool _systemDown(VoiceCapture cap) {
+    if (identical(cap, ref.read(cloudVoiceCaptureProvider))) return false;
+    return cap.failed && !_quietSystemCodes.contains(cap.errorCode);
+  }
+
+  /// 引擎报的是“没听到/没匹配”，属于没听清，不算引擎不可用
+  static const _quietSystemCodes = {'system_error_no_match', 'system_error_speech_timeout'};
+
+  /// 这次按住已结束仍失败或结果为空（松手时才发现）：本机的 → 未问过则告知，已同意则下次直接联网；联网的 / 不用 → 屏 9。
   Future<void> _recognizerFailed(VoiceCapture cap) async {
     final cloud = ref.read(cloudVoiceCaptureProvider);
-    if (identical(cap, cloud) || cloud == null) return _voiceFailed();
+    if (identical(cap, cloud) || cloud == null) return _voiceFailed(systemDown: _systemDown(cap));
     _systemBroken = true;
     ref.read(systemAsrBrokenProvider.notifier).mark();
     switch (_consent) {
@@ -306,14 +316,14 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
           await _openText();
         }
       case true:
-        _snack('本机识别不可用，已换成联网识别，请再按住说一次');
+        _snack(_systemDown(cap) ? '本机识别不可用，已换成联网识别，请再按住说一次' : '本机没听出文字，已改用联网识别，请再按住说一次');
       case false:
-        await _voiceFailed();
+        await _voiceFailed(systemDown: _systemDown(cap), cloudOff: true);
     }
   }
 
-  Future<void> _voiceFailed() async {
-    final toText = await showVoiceErrorSheet(context);
+  Future<void> _voiceFailed({bool systemDown = false, bool cloudOff = false}) async {
+    final toText = await showVoiceErrorSheet(context, systemDown: systemDown, cloudOff: cloudOff);
     if (toText == true && mounted) await _openText();
   }
 

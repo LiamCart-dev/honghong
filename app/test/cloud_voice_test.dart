@@ -218,6 +218,53 @@ void main() {
       await unmount(tester);
     });
   
+    // 回归：本机返回空结果且引擎没报错（国产 ROM 无离线中文包时常见）× 三种同意状态。
+    // 旧逻辑只在 failed=true 时走兜底，failed=false 的空结果直接弹“没听清”，永远走不到讯飞。
+    testWidgets('本机空结果不报错 · 未问过 → 弹联网告知，不弹“没听清”', (tester) async {
+      system = FakeVoice(ok: true, text: '');
+      await open(tester);
+      await hold(tester);
+      expect(find.byKey(const Key('cloud-asr-agree')), findsOneWidget);
+      expect(find.byKey(const Key('voice-err-text')), findsNothing);
+      expect(api.calls, isEmpty);
+      await unmount(tester);
+    });
+
+    testWidgets('本机空结果不报错 · 已同意 → 提示改用联网，下一次按住直接走讯飞', (tester) async {
+      system = FakeVoice(ok: true, text: '');
+      await open(tester, prefs: const {kDiaryGenderPrompted: true, kDiaryCloudAsrConsent: true});
+      await hold(tester);
+      expect(find.byKey(const Key('voice-err-text')), findsNothing);
+      expect(find.text('本机没听出文字，已改用联网识别，请再按住说一次'), findsOneWidget);
+      expect(api.calls, isEmpty);
+      await tester.pump(const Duration(seconds: 3));
+      await hold(tester);
+      expect(api.calls, ['voice:联网识别的一句话']);
+      expect(find.byKey(const Key('card-0')), findsOneWidget);
+      await unmount(tester);
+    });
+
+    testWidgets('本机空结果不报错 · 已拒绝 → 保留“没听清”，并提示可在设置里打开', (tester) async {
+      system = FakeVoice(ok: true, text: '');
+      await open(tester, prefs: const {kDiaryGenderPrompted: true, kDiaryCloudAsrConsent: false});
+      await hold(tester);
+      expect(find.byKey(const Key('cloud-asr-agree')), findsNothing);
+      expect(find.byKey(const Key('voice-err-text')), findsOneWidget);
+      expect(find.textContaining('在设置中开启「联网语音识别」'), findsOneWidget);
+      expect(api.calls, isEmpty);
+      await unmount(tester);
+    });
+
+    testWidgets('本机引擎不可用 · 已拒绝 → 文案说“暂时用不了”，不说“周围有点吵”', (tester) async {
+      system = FakeVoice(ok: false);
+      await open(tester, prefs: const {kDiaryGenderPrompted: true, kDiaryCloudAsrConsent: false});
+      await hold(tester);
+      expect(find.textContaining('暂时用不了'), findsOneWidget);
+      expect(find.textContaining('周围有点吵'), findsNothing);
+      await unmount(tester);
+    });
+  });
+
   group('设置：联网语音识别开关', () {
     late FakeVoice system, cloud;
     Future<SharedPreferences> boot(WidgetTester tester, Map<String, Object> prefs) async {
@@ -323,5 +370,4 @@ void main() {
       await unmount(tester);
     });
   });
-});
 }
