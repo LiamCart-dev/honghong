@@ -270,14 +270,15 @@ class _EmergencyLine extends StatelessWidget {
         key: const Key('stage-emergency'),
         width: double.infinity,
         padding: const EdgeInsets.all(12),
+        // 用 alertBg/alertInk：日间深红字配浅红底（5.45:1），夜间浅字配深红底（5.76:1），见 #34
         decoration: BoxDecoration(
-          color: c.endBg,
+          color: c.alertBg,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: c.endInk.withValues(alpha: .5)),
+          border: Border.all(color: c.alertInk, width: 1.5),
         ),
         child: Text(
           stageEmergencyLine,
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.endInk, height: 1.6),
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.alertInk, height: 1.6),
         ),
       ),
     );

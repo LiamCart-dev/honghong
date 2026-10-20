@@ -270,3 +270,12 @@ void main() {
   });
 }
 
+
+/// 给 stage_contrast_test 用：打开第 49 天的说明面板并滚到急症提示
+Future<void> pumpEmergencyLine(WidgetTester tester, {required bool night}) async {
+  await _pumpResult(tester, birth: DateTime(2026, 9, 1), cryAt: DateTime(2026, 10, 20, 2, 30), night: night);
+  await _openSheet(tester);
+  await _scrollTo(tester, find.byKey(const Key('stage-emergency')));
+}
+
+Future<void> closeEmergencyLine(WidgetTester tester) => _done(tester);
