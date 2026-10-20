@@ -9,7 +9,7 @@ void main() {
   // 下面的 DateTime(...) 都是进程本地时间（北京时间）
   final birth = DateTime(2026, 9, 1);
   int? utcAt(int d, int h, int m) => ageInDays(birth, DateTime(2026, 9, d, h, m).toUtc());
-  print(
+  stdout.writeln(
     jsonEncode({
       'offsetHours': DateTime(2026, 9, 8).timeZoneOffset.inHours,
       // 北京 0–8 点，UTC 输入：都应该是第 7 天
