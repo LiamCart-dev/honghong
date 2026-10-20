@@ -249,7 +249,7 @@ class _StageSection extends StatelessWidget {
             title('来源'),
             for (final s in copy.sources) _SourceLink(source: s),
             const SizedBox(height: 14),
-            const _EmergencyLine(),
+            const EmergencyLineBox(),
           ],
         ),
       ),
@@ -257,9 +257,12 @@ class _StageSection extends StatelessWidget {
   }
 }
 
-/// 每个阶段一节末尾固定的急症提示（审阅第 1 条），醒目样式
-class _EmergencyLine extends StatelessWidget {
-  const _EmergencyLine();
+/// 固定的急症提示（审阅第 1 条），醒目样式。#30 每个阶段一节的末尾用；#38 哄睡的各个面板也直接复用。
+class EmergencyLineBox extends StatelessWidget {
+  const EmergencyLineBox({super.key, this.boxKey = const Key('stage-emergency')});
+
+  /// 方便测试定位（同一屏可能有两处，比如哄睡页上面盖着安全须知面板）
+  final Key boxKey;
 
   @override
   Widget build(BuildContext context) {
@@ -267,7 +270,7 @@ class _EmergencyLine extends StatelessWidget {
     return Semantics(
       container: true,
       child: Container(
-        key: const Key('stage-emergency'),
+        key: boxKey,
         width: double.infinity,
         padding: const EdgeInsets.all(12),
         // 用 alertBg/alertInk：日间深红字配浅红底（5.45:1），夜间浅字配深红底（5.76:1），见 #34

@@ -11,6 +11,7 @@ import '../../domain/models/cause_ui.dart';
 import '../../domain/models/cry_cause.dart';
 import '../../domain/predictor/cry_predictor.dart';
 import '../care/sleep_wake_prompt.dart';
+import '../soothe/soothe_entry.dart';
 import '../stage/stage_tip.dart';
 import 'recording_page.dart';
 
@@ -149,9 +150,12 @@ class ResultPage extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(20),
                           gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFFFE7DB), Color(0xFFFFF1E8)]),
                         ),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            HhIcon(first.cause.icon, size: 44),
+                            Row(
+                              children: [
+                                HhIcon(first.cause.icon, size: 44),
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(
@@ -166,6 +170,10 @@ class ResultPage extends ConsumerWidget {
                                 ],
                               ),
                             ),
+                              ],
+                            ),
+                            // 第一名是「困了」：建议卡里直接给哄睡入口（#38）
+                            if (first.cause == CryCause.sleepy) const SootheEntry(),
                           ],
                         ),
                       ),

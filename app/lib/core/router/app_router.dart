@@ -16,6 +16,8 @@ import '../../features/home/home_page.dart';
 import '../../features/insights/insights_page.dart';
 import '../../features/logs/log_detail_page.dart';
 import '../../features/settings/settings_page.dart';
+import '../../features/soothe/soothe_page.dart';
+import '../../features/soothe/soothe_steps_page.dart';
 import '../../features/update/update_page.dart';
 import '../../features/update/update_providers.dart';
 import '../../services/audio/auto_listen.dart';
@@ -40,6 +42,8 @@ class Routes {
   static const diaryConfirm = '/diary/confirm';
   static const diaryDay = '/diary/day';
   static const diarySummary = '/diary/summary';
+  static const soothe = '/soothe';
+  static const sootheSteps = '/soothe/steps';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -71,6 +75,9 @@ final routerProvider = Provider<GoRouter>((ref) {
               date: DateTime.tryParse(s.uri.queryParameters['date'] ?? ''), args: s.extra as DiaryDayArgs?)),
       GoRoute(path: Routes.diarySummary, builder: (_, s) => SummaryPage(date: DateTime.tryParse(s.uri.queryParameters['date'] ?? ''))),
       GoRoute(path: Routes.diaryConfirm, builder: (_, s) => ConfirmPage(result: s.extra! as ParseResult)),
+      // 哄睡（#38）：顶层二级页，无底部标签栏
+      GoRoute(path: Routes.soothe, builder: (_, _) => const SoothePage()),
+      GoRoute(path: Routes.sootheSteps, builder: (_, _) => const SootheStepsPage()),
       GoRoute(path: Routes.update, builder: (_, s) => UpdatePage(initial: s.extra as UpdateCheck?)),
     ],
   );
