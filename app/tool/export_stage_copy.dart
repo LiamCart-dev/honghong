@@ -5,7 +5,7 @@ import 'package:honghong/features/stage/stage_copy.dart';
 
 void main() {
   final b = StringBuffer()
-    ..writeln('# 哄哄「按月龄阶段提示」中文文案初稿（#30）')
+    ..writeln('# 哄哄「按月龄阶段提示」中文文案（第二稿，已按 2026-10-20 审阅意见修改，#30）')
     ..writeln()
     ..writeln('> 由 `app/lib/features/stage/stage_copy.dart` 导出，请改那个文件，不要改这里。')
     ..writeln()
@@ -14,6 +14,10 @@ void main() {
     ..writeln('- 单个阶段：「${stageTipLine([CryStage.cryingPeak])}」')
     ..writeln('- 两个阶段重叠：「${stageTipLine([CryStage.growthSpurt, CryStage.cryingPeak])}」')
     ..writeln('- 小字：「$stageTipSub」')
+    ..writeln()
+    ..writeln('## 说明面板顶部（醒目）')
+    ..writeln()
+    ..writeln('> $stagePretermNote')
     ..writeln()
     ..writeln('## 日龄窗口和重叠优先级')
     ..writeln()
@@ -58,6 +62,10 @@ void main() {
     for (final r in c.sources) {
       b.writeln('- ${r.org}：[${r.title}](${r.url})（${r.date}）——「${r.quote}」');
     }
+    // 每个阶段一节的末尾：固定急症提示（醒目）
+    b
+      ..writeln()
+      ..writeln('> 🚨 **$stageEmergencyLine**');
   }
   b
     ..writeln()
