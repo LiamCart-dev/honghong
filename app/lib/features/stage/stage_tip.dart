@@ -150,7 +150,19 @@ class StageSheet extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text('按宝宝出生第 ${tip.ageDays} 天估计', style: TextStyle(fontSize: 13, color: c.sub)),
-              for (final s in tip.stages) _StageSection(copy: stageCopy[s]!),
+              const SizedBox(height: 10),
+              // 第一版不做矫正月龄，只在顶部醒目处提示（审阅第 18 条）
+              Container(
+                key: const Key('stage-preterm'),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(color: c.blueL, borderRadius: BorderRadius.circular(12)),
+                child: Text(
+                  stagePretermNote,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.blueInk),
+                ),
+              ),
+              for (final s in tip.stages) _StageSection(key: Key('stage-section-${s.name}'), copy: stageCopy[s]!),
               const SizedBox(height: 20),
               for (final n in stageCommonNotes)
                 Padding(
@@ -166,7 +178,7 @@ class StageSheet extends StatelessWidget {
 }
 
 class _StageSection extends StatelessWidget {
-  const _StageSection({required this.copy});
+  const _StageSection({super.key, required this.copy});
   final StageCopy copy;
 
   @override
@@ -236,7 +248,36 @@ class _StageSection extends StatelessWidget {
             bullets(copy.seeDoctor),
             title('来源'),
             for (final s in copy.sources) _SourceLink(source: s),
+            const SizedBox(height: 14),
+            const _EmergencyLine(),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 每个阶段一节末尾固定的急症提示（审阅第 1 条），醒目样式
+class _EmergencyLine extends StatelessWidget {
+  const _EmergencyLine();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.hh;
+    return Semantics(
+      container: true,
+      child: Container(
+        key: const Key('stage-emergency'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: c.endBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: c.endInk.withValues(alpha: .5)),
+        ),
+        child: Text(
+          stageEmergencyLine,
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.endInk, height: 1.6),
         ),
       ),
     );

@@ -122,10 +122,14 @@ void main() {
 
     await _openSheet(tester);
     expect(_inSheet('按宝宝出生第 49 天估计'), findsOneWidget);
+    expect(find.byKey(const Key('stage-preterm')), findsOneWidget); // 顶部醒目处
+    expect(_inSheet(stagePretermNote), findsOneWidget);
     expect(find.byKey(const Key('stage-keyfact-哭闹高峰期')), findsOneWidget);
     expect(_inSheet('绝不能摇晃宝宝'), findsOneWidget);
     await _scrollTo(tester, _inSheet('4 个月以后还是这样哭'));
-    await _scrollTo(tester, _inSheet('早产宝宝请按矫正月龄理解'));
+    await _scrollTo(tester, find.byKey(const Key('stage-emergency')));
+    expect(_inSheet('3 个月以下宝宝体温 ≥38℃'), findsOneWidget);
+    await _scrollTo(tester, _inSheet('不能替代医生判断'));
     expect(_inSheet('每个宝宝不一样'), findsWidgets);
     expect(_inSheet('不能替代医生判断'), findsOneWidget);
     await _done(tester);
@@ -157,8 +161,28 @@ void main() {
     expect(find.text('这周宝宝可能在猛长期，也可能在哭闹高峰期'), findsOneWidget);
     await _openSheet(tester);
     expect(_inSheet('部分宝宝可能出现几天的猛吃期'), findsOneWidget);
+    // 每个阶段一节末尾都有急症提示
+    for (final st in [CryStage.growthSpurt]) {
+      await _scrollTo(
+        tester,
+        find.descendant(
+          of: find.byKey(Key('stage-section-${st.name}')),
+          matching: find.byKey(const Key('stage-emergency')),
+        ),
+      );
+    }
     await _scrollTo(tester, find.byKey(const Key('stage-keyfact-哭闹高峰期')));
     expect(_inSheet('绝不能摇晃宝宝'), findsOneWidget);
+    // 每个阶段一节末尾都有急症提示
+    for (final st in [CryStage.cryingPeak]) {
+      await _scrollTo(
+        tester,
+        find.descendant(
+          of: find.byKey(Key('stage-section-${st.name}')),
+          matching: find.byKey(const Key('stage-emergency')),
+        ),
+      );
+    }
     await _done(tester);
   });
 
