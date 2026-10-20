@@ -9,6 +9,9 @@ class FakeSootheEngine implements SootheEngine {
   SootheSound? loaded;
   bool playing = false;
   bool failLoad = false;
+
+  /// false = 系统不给音频焦点
+  bool grantFocus = true;
   final _events = StreamController<SootheEngineEvent>.broadcast(sync: true);
 
   double get volume => volumes.isEmpty ? 0 : volumes.last;
@@ -21,6 +24,12 @@ class FakeSootheEngine implements SootheEngine {
     if (e == SootheEngineEvent.interrupted || e == SootheEngineEvent.remotePause) playing = false;
     if (e == SootheEngineEvent.remotePlay) playing = true;
     _events.add(e);
+  }
+
+  @override
+  Future<bool> activate() async {
+    calls.add('activate');
+    return grantFocus;
   }
 
   @override

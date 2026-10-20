@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:honghong/core/app_clock.dart';
 import 'package:honghong/core/prefs.dart';
 import 'package:honghong/features/soothe/soothe_audio.dart';
 import 'package:honghong/services/audio/auto_listen.dart';
@@ -207,9 +208,10 @@ void main() {
       await _ctl(c).start();
       await _wait(tester, const Duration(minutes: 5));
       await _ctl(c).selectSound(SootheSound.white);
+      await tester.pump(const Duration(seconds: 1));
       expect(engine.loaded, SootheSound.white);
       expect(engine.playing, isTrue);
-      expect(_s(c).remaining, const Duration(minutes: 25));
+      expect(_s(c).remaining.inSeconds, inInclusiveRange(24 * 60 + 58, 25 * 60));
       await _ctl(c).stop();
     });
   });
@@ -310,6 +312,129 @@ void main() {
       _listen(c).resume();
       expect(_listen(c).heldForSoothe, isTrue);
       expect(c.read(autoListenControllerProvider), AutoListenStatus.paused);
+      await _ctl(c).stop();
+    });
+  });
+
+  group('QA #38 修复', () {
+    testWidgets('第 1 条：录音页暂停了监听时，声音被打断 / 停止也不会重新打开麦克风；录音页结束后才恢复', (tester) async {
+      final (c, engine) = await _setup(tester);
+      await _ctl(c).start();
+      await _listen(c).pause(); // 录音页打开
+      engine.emit(SootheEngineEvent.interrupted);
+      expect(_listen(c).heldForSoothe, isFalse);
+      expect(_listen(c).wantsMic, isFalse, reason: '录音页还开着');
+      expect(c.read(autoListenControllerProvider), AutoListenStatus.paused);
+      await _ctl(c).resume();
+      await _ctl(c).stop();
+      expect(_listen(c).wantsMic, isFalse);
+      _listen(c).resume(); // 录音页关闭
+      expect(_listen(c).wantsMic, isTrue);
+      // 反过来：先播放、再进出录音页，声音还在播就一直不听
+      await _ctl(c).start();
+      await _listen(c).pause();
+      _listen(c).resume();
+      expect(_listen(c).wantsMic, isFalse);
+      await _ctl(c).stop();
+      expect(_listen(c).wantsMic, isTrue);
+    });
+
+    testWidgets('第 2 条：只要求调低音量的提示音：调低到 30%，结束后恢复，不暂停', (tester) async {
+      final (c, engine) = await _setup(tester);
+      await _ctl(c).start();
+      await _wait(tester, const Duration(seconds: 10));
+      expect(engine.volume, closeTo(.30, 1e-9));
+      engine.emit(SootheEngineEvent.duck);
+      expect(_s(c).phase, SoothePhase.playing);
+      expect(engine.playing, isTrue);
+      expect(engine.volume, closeTo(.30 * sootheDuckFactor, 1e-9));
+      await _wait(tester, const Duration(seconds: 2));
+      expect(engine.volume, closeTo(.30 * sootheDuckFactor, 1e-9));
+      engine.emit(SootheEngineEvent.unduck);
+      expect(engine.volume, closeTo(.30, 1e-9));
+      expect(_listen(c).heldForSoothe, isTrue);
+      await _ctl(c).stop();
+    });
+
+    testWidgets('第 4 条：拿不到音频焦点 → 出错状态，不显示播放中；播放中途出错也一样', (tester) async {
+      final (c, engine) = await _setup(tester);
+      engine.grantFocus = false;
+      await _ctl(c).start();
+      expect(_s(c).phase, SoothePhase.error);
+      expect(engine.calls, isNot(contains('play')));
+      expect(_listen(c).heldForSoothe, isFalse);
+      engine.grantFocus = true;
+      await _ctl(c).start();
+      expect(_s(c).phase, SoothePhase.playing);
+      engine.emit(SootheEngineEvent.failed);
+      expect(_s(c).phase, SoothePhase.error);
+      expect(_listen(c).heldForSoothe, isFalse);
+      await _wait(tester, const Duration(minutes: 1));
+      expect(_s(c).phase, SoothePhase.error);
+    });
+
+    testWidgets('第 5 条：改系统时间不影响剩余时间（用单调时钟）', (tester) async {
+      final (c, _) = await _setup(tester);
+      await _ctl(c).start();
+      await _wait(tester, const Duration(minutes: 10));
+      final before = _s(c).remaining;
+      final src = AppClock.source;
+      AppClock.source = () => src().add(const Duration(hours: 3)); // 用户把系统时间往后调 3 小时
+      await tester.pump(const Duration(seconds: 1));
+      expect(_s(c).phase, SoothePhase.playing);
+      expect(_s(c).remaining.inSeconds, inInclusiveRange(before.inSeconds - 2, before.inSeconds));
+      AppClock.source = () => src().subtract(const Duration(hours: 3)); // 往前调
+      await tester.pump(const Duration(seconds: 1));
+      expect(_s(c).remaining.inSeconds, inInclusiveRange(before.inSeconds - 3, before.inSeconds - 1));
+      await _wait(tester, const Duration(minutes: 20));
+      expect(_s(c).phase, SoothePhase.ended);
+      expect(_s(c).playedMinutes, 30);
+    });
+
+    testWidgets('第 6 条：播放中换声音先淡出到 0 再换，再淡入；音量不跳变', (tester) async {
+      final (c, engine) = await _setup(tester);
+      await _ctl(c).start();
+      await _wait(tester, const Duration(seconds: 10));
+      engine.volumes.clear();
+      engine.calls.clear();
+      await _ctl(c).selectSound(SootheSound.brown);
+      expect(engine.loaded, SootheSound.pink, reason: '还在淡出旧声音');
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(engine.loaded, SootheSound.pink);
+      expect(engine.volume, lessThan(.30));
+      await tester.pump(const Duration(seconds: 2));
+      expect(engine.loaded, SootheSound.brown);
+      expect(engine.volume, closeTo(.30, 1e-9));
+      final loadAt = engine.calls.indexOf('load:brown');
+      expect(loadAt, isNonNegative);
+      // 换之前音量已经降到 0
+      final v = engine.volumes;
+      final zero = v.indexOf(0);
+      expect(zero, isNonNegative);
+      for (var i = 1; i < v.length; i++) {
+        expect((v[i] - v[i - 1]).abs(), lessThanOrEqualTo(.07), reason: '第 $i 步 ${v[i - 1]} → ${v[i]}');
+      }
+      expect(_s(c).remaining.inSeconds, greaterThan(29 * 60));
+      await _ctl(c).stop();
+    });
+
+    testWidgets('第 7 条：每次开始 / 继续 / 再播之前都重新激活音频会话（切回播放类别）', (tester) async {
+      final (c, engine) = await _setup(tester);
+      List<String> beforePlays() => [
+        for (var i = 0; i < engine.calls.length; i++)
+          if (engine.calls[i] == 'play') engine.calls.sublist(0, i).lastWhere((x) => x == 'activate' || x == 'play', orElse: () => ''),
+      ];
+      await _ctl(c).start();
+      engine.emit(SootheEngineEvent.interrupted);
+      // 中间去录了一次音（录音插件改了音频类别）
+      await _listen(c).pause();
+      _listen(c).resume();
+      await _ctl(c).resume();
+      await _wait(tester, const Duration(minutes: 31));
+      await _ctl(c).playExtra();
+      final plays = engine.calls.where((x) => x == 'play').length;
+      expect(plays, 3);
+      expect(beforePlays(), everyElement('activate'));
       await _ctl(c).stop();
     });
   });

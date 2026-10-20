@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:honghong/core/prefs.dart';
 import 'package:honghong/core/providers.dart';
 import 'package:honghong/data/db/app_database.dart';
+import 'package:honghong/features/soothe/soothe_audio.dart' show SootheAudioController;
 import 'package:honghong/domain/models/care_log_type.dart';
 import 'package:honghong/main.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -35,6 +36,10 @@ void fixClock(WidgetTester tester, DateTime base) {
   final t0 = tester.binding.clock.now();
   AppClock.source = () => base.add(tester.binding.clock.now().difference(t0));
   addTearDown(() => AppClock.source = DateTime.now);
+  // 哄睡声音的定时用单调时钟，同样跟着假时间走
+  final m0 = SootheAudioController.monotonic;
+  SootheAudioController.monotonic = () => tester.binding.clock.now().difference(t0);
+  addTearDown(() => SootheAudioController.monotonic = m0);
 }
 
 /// 有脉冲动画和每秒计时器，不能 pumpAndSettle，固定推进几帧

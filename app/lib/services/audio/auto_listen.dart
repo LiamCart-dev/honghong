@@ -30,11 +30,18 @@ class AutoListenController extends Notifier<AutoListenStatus> {
   CryDetector? _detector;
   final _buffer = FrameBuffer();
   final _trigger = CryTrigger();
+
+  /// 录音页 / 日记页 / 检测到哭声时暂停（[pause] / [resume]）
   bool _paused = false;
 
-  /// 哄睡声音播放中（#38）：一直暂停，录音页结束时调的 [resume] 也不会重新打开麦克风
+  /// 哄睡声音播放中（#38）。和 [_paused] 分开记：两个都解除了才重新打开麦克风，
+  /// 否则声音被打断时 [releaseSoothe] 会在录音页还开着时抢麦克风（QA #38 第 1 条）
   bool _held = false;
   bool get heldForSoothe => _held;
+
+  /// 现在是否应该在听（两种暂停都没有）
+  @visibleForTesting
+  bool get wantsMic => !_paused && !_held;
 
   /// 测试或无原生环境时关闭真实麦克风
   static bool enabledInThisEnv = !kIsWeb && !Platform.environment.containsKey('FLUTTER_TEST');
@@ -48,7 +55,7 @@ class AutoListenController extends Notifier<AutoListenStatus> {
       return AutoListenStatus.off;
     }
     if (!enabledInThisEnv) return AutoListenStatus.unavailable;
-    if (_paused) return AutoListenStatus.paused;
+    if (!wantsMic) return AutoListenStatus.paused;
     Future.microtask(_start);
     return AutoListenStatus.starting;
   }
@@ -62,8 +69,7 @@ class AutoListenController extends Notifier<AutoListenStatus> {
         return;
       }
       _detector ??= await CryDetector.load();
-      final stream = await rec.startStream(const RecordConfig(
-          encoder: AudioEncoder.pcm16bits, sampleRate: CryDetector.sampleRate, numChannels: 1));
+      final stream = await rec.startStream(const RecordConfig(encoder: AudioEncoder.pcm16bits, sampleRate: CryDetector.sampleRate, numChannels: 1));
       _sub = stream.listen(_onPcm);
       state = AutoListenStatus.listening;
     } catch (e) {
@@ -74,7 +80,7 @@ class AutoListenController extends Notifier<AutoListenStatus> {
 
   void _onPcm(Uint8List bytes) {
     final d = _detector;
-    if (d == null || _paused) return;
+    if (d == null || !wantsMic) return;
     for (final f in _buffer.add(pcm16ToFloat(bytes))) {
       if (onScore(d.score(f), AppClock.now())) return;
     }
@@ -96,6 +102,10 @@ class AutoListenController extends Notifier<AutoListenStatus> {
   /// 录音页占用麦克风前调用
   Future<void> pause() async {
     _paused = true;
+    await _halt();
+  }
+
+  Future<void> _halt() async {
     await _stop();
     if (state != AutoListenStatus.off) state = AutoListenStatus.paused;
   }
@@ -103,20 +113,24 @@ class AutoListenController extends Notifier<AutoListenStatus> {
   /// 哄睡声音开始播放时调用（#38）：麦克风会把白噪音或嘘声听成哭声，哭声也会被盖住
   Future<void> holdForSoothe() async {
     _held = true;
-    await pause();
+    await _halt();
   }
 
-  /// 哄睡声音停止、播完或被打断暂停后调用，恢复自动听哭声
+  /// 哄睡声音停止、播完或被打断暂停后调用；录音页还开着（[pause] 过）时不打开麦克风
   void releaseSoothe() {
     if (!_held) return;
     _held = false;
-    resume();
+    _restart();
   }
 
-  /// 录音页关闭后调用
+  /// 录音页关闭后调用；哄睡声音还在播时不打开麦克风
   void resume() {
-    if (_held) return; // 哄睡声音还在播放，等它停了再恢复
     _paused = false;
+    _restart();
+  }
+
+  void _restart() {
+    if (!wantsMic) return;
     if (ref.read(autoListenProvider) && enabledInThisEnv) {
       state = AutoListenStatus.starting;
       _start();
@@ -132,5 +146,4 @@ class AutoListenController extends Notifier<AutoListenStatus> {
   }
 }
 
-final autoListenControllerProvider =
-    NotifierProvider<AutoListenController, AutoListenStatus>(AutoListenController.new);
+final autoListenControllerProvider = NotifierProvider<AutoListenController, AutoListenStatus>(AutoListenController.new);

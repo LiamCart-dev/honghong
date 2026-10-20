@@ -137,6 +137,7 @@ void main() {
     await _tap(tester, 'soothe-play');
     expect(_rich(playerPlayingStatus('嘘声', '15:00')), findsOneWidget);
     await _tap(tester, 'sound-brown');
+    await settle(tester, 4); // 先淡出 0.5 秒再换
     expect(_engine.loaded, SootheSound.brown);
     expect(_engine.playing, isTrue);
     await _tap(tester, 'soothe-stop');
@@ -214,7 +215,9 @@ void main() {
     expect(_engine.playing, isFalse);
     await _tap(tester, 'soothe-resume');
     expect(_engine.playing, isTrue);
-    expect(_rich(playerPlayingStatus('粉噪音', '28:00')), findsOneWidget);
+    final left = _container(tester).read(sootheAudioProvider).remaining;
+    expect(left.inSeconds, inInclusiveRange(27 * 60 + 58, 28 * 60));
+    expect(_rich(playerPlayingStatus('粉噪音', formatRemaining(left))), findsOneWidget);
     await _tap(tester, 'soothe-stop');
     await _done(tester, db);
   });
@@ -309,6 +312,26 @@ void main() {
     await _tap(tester, 'soothe-play');
     expect(tester.getSize(find.byKey(const Key('soothe-stop'))).height, greaterThanOrEqualTo(48));
     await _tap(tester, 'soothe-stop');
+    await _done(tester, db);
+  });
+
+  testWidgets('QA 第 3 条（Liam 决定）：播放中点「睡着了」→ 声音马上停（和「停止」一样）、开始记录睡觉、回首页', (tester) async {
+    final db = await _pump(tester);
+    await _tap(tester, 'soothe-play');
+    expect(_engine.playing, isTrue);
+    await _wait(tester, const Duration(minutes: 3));
+    await _tap(tester, 'soothe-asleep');
+    await settle(tester, 6);
+    expect(_engine.playing, isFalse);
+    expect(_engine.calls.last, 'stop');
+    final c = _container(tester);
+    expect(c.read(sootheAudioProvider).phase, SoothePhase.idle);
+    expect(c.read(autoListenControllerProvider.notifier).heldForSoothe, isFalse);
+    final open = (await tester.runAsync(() => db.select(db.careLogs).get()))!.where((l) => l.type == 'sleep' && l.endedAt == null).toList();
+    expect(open, hasLength(1));
+    expect(find.text('宝宝在哭'), findsOneWidget);
+    await _wait(tester, const Duration(minutes: 40));
+    expect(_engine.playing, isFalse);
     await _done(tester, db);
   });
 }
