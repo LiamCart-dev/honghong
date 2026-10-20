@@ -14,6 +14,8 @@ import '../care/care_actions.dart';
 import '../cry/recording_page.dart' show CircleBack;
 import '../stage/stage_tip.dart' show EmergencyLineBox;
 import 'sleep_reminder.dart';
+import 'soothe_audio.dart';
+import 'soothe_player.dart';
 import 'soothe_copy.dart';
 import 'soothe_widgets.dart';
 
@@ -36,6 +38,10 @@ class _SoothePageState extends ConsumerState<SoothePage> {
   @override
   void initState() {
     super.initState();
+    // 每次进来：没在播（或已经播完）就回到默认值：粉噪音、30%、30 分钟、未播放（终稿 11 边界情况）
+    Future.microtask(() {
+      if (mounted) ref.read(sootheAudioProvider.notifier).resetIfNotActive();
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final prefs = ref.read(prefsProvider);
@@ -114,12 +120,16 @@ class _SoothePageState extends ConsumerState<SoothePage> {
                 ),
               ),
             ],
+            const SizedBox(height: 4),
+            const SoothePlayerControls(),
             const SootheSafetySection(id: 'soothe'),
           ],
           bottom: SootheBottomBar(
             key: const Key('soothe-bottom'),
             children: [
-              _AsleepButton(sleeping: sleeping, onTap: _asleep),
+              SoothePlayerBar(
+                asleep: _AsleepButton(sleeping: sleeping, onTap: _asleep),
+              ),
               Center(
                 child: SootheLink(key: const Key('soothe-steps-link'), label: stepsEntry, onTap: () => context.push(Routes.sootheSteps)),
               ),

@@ -12,6 +12,7 @@ import '../../core/widgets/hh_widgets.dart';
 import '../../domain/stages/cry_stage.dart';
 import '../cry/recording_page.dart' show CircleBack;
 import 'soothe_copy.dart';
+import 'soothe_player.dart';
 import 'soothe_widgets.dart';
 
 /// 宝宝现在是不是在 #30 的哭闹高峰期（按今天的日龄）。
@@ -173,6 +174,8 @@ class _SootheStepsPageState extends ConsumerState<SootheStepsPage> {
           bottom: SootheBottomBar(
             key: const Key('steps-bottom'),
             children: [
+              // 声音在播放 / 暂停时显示「粉噪音播放中 · 26:10 后关闭  停止」（终稿 04）
+              const SootheMiniPlayer(),
               if (largeText(context)) ...[
                 next,
                 const SizedBox(height: 8),

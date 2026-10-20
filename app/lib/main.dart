@@ -9,11 +9,14 @@ import 'core/env.dart';
 import 'core/prefs.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'services/audio/soothe_engine.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('zh_CN');
   final prefs = await SharedPreferences.getInstance();
+  // 哄睡声音（#38）：锁屏后继续播放 + 锁屏控件，要在 runApp 之前初始化
+  await initSootheBackgroundAudio();
   if (cloudConfigured) {
     try {
       await Supabase.initialize(url: supabaseUrl, publishableKey: supabaseAnonKey);

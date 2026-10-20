@@ -32,6 +32,10 @@ class AutoListenController extends Notifier<AutoListenStatus> {
   final _trigger = CryTrigger();
   bool _paused = false;
 
+  /// 哄睡声音播放中（#38）：一直暂停，录音页结束时调的 [resume] 也不会重新打开麦克风
+  bool _held = false;
+  bool get heldForSoothe => _held;
+
   /// 测试或无原生环境时关闭真实麦克风
   static bool enabledInThisEnv = !kIsWeb && !Platform.environment.containsKey('FLUTTER_TEST');
 
@@ -96,8 +100,22 @@ class AutoListenController extends Notifier<AutoListenStatus> {
     if (state != AutoListenStatus.off) state = AutoListenStatus.paused;
   }
 
+  /// 哄睡声音开始播放时调用（#38）：麦克风会把白噪音或嘘声听成哭声，哭声也会被盖住
+  Future<void> holdForSoothe() async {
+    _held = true;
+    await pause();
+  }
+
+  /// 哄睡声音停止、播完或被打断暂停后调用，恢复自动听哭声
+  void releaseSoothe() {
+    if (!_held) return;
+    _held = false;
+    resume();
+  }
+
   /// 录音页关闭后调用
   void resume() {
+    if (_held) return; // 哄睡声音还在播放，等它停了再恢复
     _paused = false;
     if (ref.read(autoListenProvider) && enabledInThisEnv) {
       state = AutoListenStatus.starting;
