@@ -19,6 +19,9 @@ import '../../services/audio/auto_listen.dart';
 import 'analyzing_view.dart';
 import '../../core/app_clock.dart';
 
+/// 测试用：替代真实麦克风的音量流（dBFS，-60 安静 … 0 最大）。null = 用真实录音。
+final recordingAmplitudeOverrideProvider = Provider<Stream<double>?>((ref) => null);
+
 /// 录音（设计稿 11）：16kHz 单声道 WAV，最长 10 秒，实时波形 + 倒计时圆环。
 /// 没有麦克风权限时仍可"现在就分析"，只用记录推断。
 class RecordingPage extends ConsumerStatefulWidget {
@@ -34,7 +37,8 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
   static const bars = 26;
   AudioRecorder? _recorder;
   final _startedAt = AppClock.now();
-  final _levels = List<double>.filled(bars, .08);
+  // 必须可变长：每次音量回调都 removeAt(0) + add，固定长度的 List 会抛 UnsupportedError（#37）
+  final _levels = List<double>.filled(bars, .08, growable: true);
   Timer? _timer;
   StreamSubscription<Amplitude>? _amp;
   int _elapsedMs = 0;
@@ -59,7 +63,24 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
     _start();
   }
 
+  /// 收到一次音量（录音插件每 90ms 回调一次）：波形左移一格，最右边补上新值
+  void _onAmplitude(double dbfs) {
+    // dBFS：-60 安静 … 0 最大
+    final v = ((dbfs + 60) / 60).clamp(0.06, 1.0);
+    if (!mounted) return;
+    setState(() {
+      _levels.removeAt(0);
+      _levels.add(v);
+    });
+  }
+
   Future<void> _start() async {
+    final fake = ref.read(recordingAmplitudeOverrideProvider);
+    if (fake != null) {
+      _amp = fake.map((d) => Amplitude(current: d, max: 0)).listen((a) => _onAmplitude(a.current));
+      _recording = true; // 还在 initState 里，第一次 build 之前，不用 setState
+      return;
+    }
     if (!AutoListenController.enabledInThisEnv) return; // 测试环境没有麦克风
     try {
       await _auto.pause();
@@ -74,15 +95,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
         const RecordConfig(encoder: AudioEncoder.wav, sampleRate: 16000, numChannels: 1),
         path: p.join(dir.path, '${_startedAt.millisecondsSinceEpoch}.wav'),
       );
-      _amp = rec.onAmplitudeChanged(const Duration(milliseconds: 90)).listen((a) {
-        // dBFS：-60 安静 … 0 最大
-        final v = ((a.current + 60) / 60).clamp(0.06, 1.0);
-        if (!mounted) return;
-        setState(() {
-          _levels.removeAt(0);
-          _levels.add(v);
-        });
-      });
+      _amp = rec.onAmplitudeChanged(const Duration(milliseconds: 90)).listen((a) => _onAmplitude(a.current));
       if (mounted) setState(() => _recording = true);
     } catch (_) {
       // 录音失败时退化为仅用记录推断
