@@ -19,6 +19,7 @@ import '../care/care_actions.dart';
 import '../care/care_log_row.dart';
 import '../care/sleep_wake_prompt.dart';
 import '../diary/diary_entry_card.dart';
+import '../soothe/sleep_reminder.dart';
 import '../diary/diary_providers.dart' show summaryTriggerProvider;
 import '../../core/app_clock.dart';
 
@@ -107,6 +108,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       children: [
         const _Header(),
         _StatusBar(active: active),
+        // 哄睡提醒（#38）：内嵌在状态条下方，不遮挡下面的入口
+        const SleepReminderCard(),
         _CryButton(onTap: () => context.push(Routes.recording)),
         if (!night) const _AutoListenToggle(),
         const SizedBox(height: 18),
