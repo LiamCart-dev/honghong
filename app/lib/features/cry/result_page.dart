@@ -11,6 +11,7 @@ import '../../domain/models/cause_ui.dart';
 import '../../domain/models/cry_cause.dart';
 import '../../domain/predictor/cry_predictor.dart';
 import '../care/sleep_wake_prompt.dart';
+import '../stage/stage_tip.dart';
 import 'recording_page.dart';
 
 final _eventPredictionProvider = FutureProvider.family<Prediction?, String>((ref, id) async {
@@ -169,6 +170,7 @@ class ResultPage extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(height: 14),
+                      StageTipRow(eventId: eventId),
                       const SleepResultCard(),
                       for (var i = 0; i < top.length; i++) _CauseTile(score: top[i], pct: pct(top[i]), initiallyOpen: i == 0),
                       const SizedBox(height: 4),

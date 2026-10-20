@@ -51,6 +51,8 @@ class Hh extends ThemeExtension<Hh> {
     required this.runBorder,
     required this.endBg,
     required this.endInk,
+    required this.alertBg,
+    required this.alertInk,
     required this.tabBg,
     required this.tabInk,
     required this.tabOn,
@@ -70,6 +72,9 @@ class Hh extends ThemeExtension<Hh> {
   final Color blue, blueL, blueInk, green, greenL, greenInk, seg;
   final Color statusBg, statusInk, cryFrom, cryTo, cryInk;
   final Color runBg, runBorder, endBg, endInk;
+
+  /// 急症 / 立即就医提示：醒目的红色调，文字和底色对比度日夜都 ≥ WCAG AA 4.5:1（#34，有测试锁定）
+  final Color alertBg, alertInk;
   final Color tabBg, tabInk, tabOn, liveRow, shadow;
 
   /// 0 = 日间，1 = 夜间；日夜切换动画中间是小数。用来给"日夜各一套写死的值"做插值。
@@ -117,6 +122,8 @@ class Hh extends ThemeExtension<Hh> {
     runBorder: Color(0xFFFFB89A),
     endBg: Color(0xFFFF9874),
     endInk: Colors.white,
+    alertBg: Color(0xFFFFE5DE),
+    alertInk: Color(0xFFB3261E),
     tabBg: Color(0xEBFFFFFF),
     tabInk: Color(0xFF8A8494),
     tabOn: Color(0xFFFF9874),
@@ -157,6 +164,8 @@ class Hh extends ThemeExtension<Hh> {
     runBorder: Color(0xFF5A3028),
     endBg: Color(0xFF8A3A30),
     endInk: Color(0xFFF8D8D0),
+    alertBg: Color(0xFF8A3A30),
+    alertInk: Color(0xFFF8D8D0),
     tabBg: Color(0xFF170E0D),
     tabInk: Color(0xFF6E3A33),
     tabOn: Color(0xFFD0705F),
@@ -207,6 +216,8 @@ class Hh extends ThemeExtension<Hh> {
       runBorder: Color.lerp(runBorder, o.runBorder, t)!,
       endBg: Color.lerp(endBg, o.endBg, t)!,
       endInk: Color.lerp(endInk, o.endInk, t)!,
+      alertBg: Color.lerp(alertBg, o.alertBg, t)!,
+      alertInk: Color.lerp(alertInk, o.alertInk, t)!,
       tabBg: Color.lerp(tabBg, o.tabBg, t)!,
       tabInk: Color.lerp(tabInk, o.tabInk, t)!,
       tabOn: Color.lerp(tabOn, o.tabOn, t)!,
