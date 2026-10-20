@@ -127,3 +127,32 @@ const asleepAlreadyLogging = '睡觉已在计时';
 const prevStep = '上一步';
 const nextStepPrefix = '下一步：';
 const stepsDone = '完成';
+
+// ───────── 哄睡声音（S-3，界面文字，不含医学内容） ─────────
+
+const playerSoundHeading = '声音';
+const playerDefaultTag = '默认';
+String playerVolumeLabel(double v) => '音量 ${(v * 100).round()}%';
+const playerVolumeMax = '最高 70%';
+const playerTimerHeading = '定时关闭';
+String playerTimerOption(int minutes) => '$minutes 分钟';
+const playerPlay = '开始播放';
+const playerStop = '停止';
+const playerResume = '继续';
+const playerExtra = '再播 15 分钟';
+const playerRetry = '再试一次';
+
+/// 「粉噪音播放中 · 28:41 后自动关闭」（终稿 03）
+String playerPlayingStatus(String sound, String left) => '**$sound播放中** · $left 后自动关闭';
+
+/// 步骤页底部迷你条「粉噪音播放中 · 26:10 后关闭」（终稿 04）
+String playerMiniStatus(String sound, String left) => '**$sound播放中** · $left 后关闭';
+
+/// 被来电等打断，或在锁屏上按了暂停（定稿边界规则 1）
+const playerPausedStatus = '**已暂停** · 点继续';
+
+/// 定时结束（终稿 11）「已自动关闭 · 粉噪音播放了 30 分钟」
+String playerEndedStatus(String sound, int minutes) => '**已自动关闭** · $sound播放了 $minutes 分钟';
+
+/// 声音没能播放：退回到 B2 第 4 步里自己发"嘘——"的办法（审定文案原句的前半段）
+const playerErrorLine = '声音没能播放。可以在耳边轻轻发出"嘘——"。';

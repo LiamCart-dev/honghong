@@ -60,6 +60,9 @@ dependencies:
   home_widget: ^0.10.0
   speech_to_text: ^7.5.0
   url_launcher: ^6.3.3
+  just_audio: ^0.10.6
+  audio_session: ^0.2.4
+  just_audio_background: ^0.0.1-beta.17
 
 dev_dependencies:
   flutter_test:
@@ -85,6 +88,11 @@ flutter:
     - assets/models/
     - assets/brand/mark-1024.png
     - assets/icons/
+    # 哄睡声音（#38），脚本生成，CC0，见 assets/soothe/LICENSE.md
+    - assets/soothe/white.wav
+    - assets/soothe/pink.wav
+    - assets/soothe/brown.wav
+    - assets/soothe/shush.wav
 
 flutter_launcher_icons:
   android: true

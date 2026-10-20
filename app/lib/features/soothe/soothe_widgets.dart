@@ -7,9 +7,10 @@ import 'soothe_copy.dart';
 
 /// 文案里 `**…**` 的部分加粗显示
 class CopyText extends StatelessWidget {
-  const CopyText(this.text, {super.key, this.style});
+  const CopyText(this.text, {super.key, this.style, this.textAlign});
   final String text;
   final TextStyle? style;
+  final TextAlign? textAlign;
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +27,7 @@ class CopyText extends StatelessWidget {
         ],
       ),
       style: style,
+      textAlign: textAlign,
     );
   }
 }
