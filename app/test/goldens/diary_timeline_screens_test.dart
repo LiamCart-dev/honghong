@@ -84,7 +84,8 @@ void main() {
         await precacheImage(AssetImage(i.asset), ctx);
       }
     });
-    await tester.ensureVisible(find.byKey(const Key('diary-entry')));
+    // 首页是懒加载列表：哄睡提醒卡（#38）出现后日记入口在第一屏下面、还没建出来，ensureVisible 找不到，要先滚过去
+    await tester.scrollUntilVisible(find.byKey(const Key('diary-entry')), 200, scrollable: find.byType(Scrollable).first);
     await tester.tap(find.byKey(const Key('diary-entry')));
     await settle(tester, 10);
 

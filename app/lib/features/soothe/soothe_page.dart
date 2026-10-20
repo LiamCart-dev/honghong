@@ -54,6 +54,8 @@ class _SoothePageState extends ConsumerState<SoothePage> {
 
   Future<void> _asleep() async {
     HapticFeedback.lightImpact();
+    // 睡着了：声音马上停（和「停止」一样），不再播到定时结束（Liam 2026-10-20 决定，QA #38 第 3 条）
+    await ref.read(sootheAudioProvider.notifier).stop();
     await CareActions(ref).start(CareLogType.sleep);
     if (mounted) context.go(Routes.home);
   }
