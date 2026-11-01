@@ -35,10 +35,13 @@ final Map<CryStage, List<AgeWindow>> stageWindows = {
   ],
 };
 
-/// 日龄：按本地日历日计算（与时区、夏令时、几点出生无关）。[at] 早于生日时返回 null。
+/// 日龄：按设备本地日历日计算（与时区、夏令时、几点出生无关）。[at] 早于生日时返回 null。
+/// 两个参数不管带什么时区（比如云端同步来的 UTC 时间），都先转成本地时间再取年月日（#35）。
 int? ageInDays(DateTime birthDate, DateTime at) {
-  final b = DateTime.utc(birthDate.year, birthDate.month, birthDate.day);
-  final a = DateTime.utc(at.year, at.month, at.day);
+  final bl = birthDate.toLocal();
+  final al = at.toLocal();
+  final b = DateTime.utc(bl.year, bl.month, bl.day);
+  final a = DateTime.utc(al.year, al.month, al.day);
   final d = a.difference(b).inDays;
   return d < 0 ? null : d;
 }
