@@ -246,6 +246,32 @@ void main() {
     await _done(tester);
   });
 
+  testWidgets('读屏（#36）：来源链接的日期和原文引句都能被读到，并且仍然是一个可点的链接', (tester) async {
+    final handle = tester.ensureSemantics();
+    await _pumpResult(tester, birth: birth, cryAt: day49);
+    await _openSheet(tester);
+    final sources = stageCopy[CryStage.cryingPeak]!.sources;
+    expect(sources, isNotEmpty);
+    for (final src in sources) {
+      final link = find.byKey(Key('stage-source-${src.url}'));
+      await _scrollTo(tester, link);
+      final node = tester.getSemantics(link);
+      final data = node.getSemanticsData();
+      final spoken = '${data.label} ${data.hint}';
+      expect(node.flagsCollection.isLink, isTrue, reason: src.url);
+      expect(data.hasAction(SemanticsAction.tap), isTrue, reason: src.url);
+      expect(spoken, contains(src.org), reason: src.url);
+      expect(spoken, contains(src.title), reason: src.url);
+      expect(spoken, contains(src.date), reason: '日期要读出来：${src.url}');
+      expect(spoken, contains(src.quote), reason: '原文引句要读出来：${src.url}');
+      // 读屏树里也能按文字找到（不是被 excludeSemantics 藏掉的）
+      expect(find.bySemanticsLabel(RegExp(RegExp.escape(src.quote))), findsWidgets, reason: src.url);
+      expect(find.bySemanticsLabel(RegExp(RegExp.escape(src.date))), findsWidgets, reason: src.url);
+    }
+    handle.dispose();
+    await _done(tester);
+  });
+
   testWidgets('减少动态效果：说明面板直接出现，没有滑入动画', (tester) async {
     await _pumpResult(tester, birth: birth, cryAt: day49, reduceMotion: true);
     await tester.ensureVisible(find.byKey(const Key('stage-tip')));

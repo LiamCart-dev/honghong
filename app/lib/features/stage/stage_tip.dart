@@ -288,6 +288,9 @@ class EmergencyLineBox extends StatelessWidget {
   }
 }
 
+/// 来源链接给读屏的完整内容：「来源：机构，标题，日期。原文：「引句」」
+String sourceLinkSemanticsLabel(StageSource s) => '来源：${s.org}，${s.title}，${s.date}。原文：「${s.quote}」';
+
 class _SourceLink extends ConsumerWidget {
   const _SourceLink({required this.source});
   final StageSource source;
@@ -304,9 +307,12 @@ class _SourceLink extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.hh;
+    // 读屏和看得见的内容一致：机构、标题、日期、原文引句都读出来；"点按在浏览器打开"作为提示（#36）。
+    // 整块仍然是一个链接节点，读屏只停一次。
     return Semantics(
       link: true,
-      label: '来源：${source.org}，${source.title}，点按在浏览器打开',
+      label: sourceLinkSemanticsLabel(source),
+      hint: '点按在浏览器打开',
       excludeSemantics: true,
       onTap: () => _open(context, ref),
       child: InkWell(
