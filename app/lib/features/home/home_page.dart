@@ -22,6 +22,8 @@ import '../diary/diary_entry_card.dart';
 import '../health/health_entry_row.dart';
 import '../health/health_log_row.dart';
 import '../health/health_providers.dart';
+import '../health/med_sheet.dart';
+import '../health/symptom_sheet.dart';
 import '../health/temp_sheet.dart';
 import '../../domain/health/health_models.dart';
 import '../soothe/sleep_reminder.dart';
@@ -850,8 +852,13 @@ class _Timeline extends ConsumerWidget {
                           last: i == merged.length - 1,
                           onTap: () {
                             final h = merged[i] as HealthLog;
-                            if (h.kind == HealthKind.temperature.name) {
-                              showTempSheet(context, existing: h);
+                            switch (HealthKind.values.byName(h.kind)) {
+                              case HealthKind.temperature:
+                                showTempSheet(context, existing: h);
+                              case HealthKind.medication:
+                                showMedSheet(context, existing: h);
+                              case HealthKind.symptom:
+                                showSymptomSheet(context, existing: h);
                             }
                           },
                         ),

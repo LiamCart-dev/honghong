@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_icon.dart';
 import 'health_providers.dart';
+import 'med_sheet.dart';
+import 'symptom_sheet.dart';
 import 'temp_sheet.dart';
 
 /// 首页快捷区下方的三个健康入口（设计稿 01；夜间也显示）。
@@ -38,16 +40,29 @@ class HealthEntryRow extends ConsumerWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(child: _Entry(icon: AppIcon.healthTemp, label: '体温', semantic: '记体温', onTap: () => showTempSheet(context))),
+                Expanded(
+                  child: _Entry(
+                    icon: AppIcon.healthTemp,
+                    label: '体温',
+                    semantic: '记体温',
+                    onTap: () async {
+                      if (await showTempSheet(context) && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已记下体温')));
+                      }
+                    },
+                  ),
+                ),
                 gap,
                 Expanded(
                   child: _Entry(
                     icon: AppIcon.healthMed,
                     label: '用药',
                     semantic: '记用药',
-                    onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('用药记录下一版开放')),
-                    ),
+                    onTap: () async {
+                      if (await showMedSheet(context) && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已记下用药')));
+                      }
+                    },
                   ),
                 ),
                 gap,
@@ -56,9 +71,11 @@ class HealthEntryRow extends ConsumerWidget {
                     icon: AppIcon.healthSymptom,
                     label: '症状',
                     semantic: '记症状',
-                    onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('症状记录下一版开放')),
-                    ),
+                    onTap: () async {
+                      if (await showSymptomSheet(context) && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已记下症状')));
+                      }
+                    },
                   ),
                 ),
               ],
