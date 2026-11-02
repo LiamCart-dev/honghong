@@ -61,3 +61,13 @@
 | `diary` | 首页入口卡/今日小结/首次引导的本子图标 |
 | `keyboard` | 录音页“改用文字输入” |
 | `edit` | 确认卡片右侧编辑 |
+
+## 健康记录（#1 / 原 #28）
+
+正式图标（设计稿 v3 `icons/`，非草稿）。目录对齐本仓：`1x` / `2.0x` / `3.0x` PNG + `svg/`。
+
+| 文件名 | 用途 | 来源 |
+|---|---|---|
+| `health_temp` | 体温入口 / 时间线 / 面板头 | 设计稿 v3 icons；AppIcon.healthTemp |
+| `health_med` | 用药入口 / 时间线 / 面板头 | 设计稿 v3 icons；AppIcon.healthMed（面板 UI 见 PR-E） |
+| `health_symptom` | 症状入口 / 时间线 / 面板头 | 设计稿 v3 icons；AppIcon.healthSymptom（面板 UI 见 PR-E） |

@@ -52,7 +52,11 @@ enum AppIcon {
   // 妈咪日记（设计稿内联 SVG 导出，见 docs/design/mommy-diary/export_icons.py）
   diary('diary'),
   keyboard('keyboard'),
-  edit('edit');
+  edit('edit'),
+  // 健康记录（#1 / 原 #28，设计稿 v3 正式图标）
+  healthTemp('health_temp'),
+  healthMed('health_med'),
+  healthSymptom('health_symptom');
 
   const AppIcon(this.file);
   final String file;

@@ -19,3 +19,7 @@ String resolveAiGatewayUrl(String explicit, String supabase) {
   return '${s.endsWith('/') ? s : '$s/'}ai/';
 }
 bool get aiGatewayConfigured => cloudConfigured && aiGatewayUrl.isNotEmpty;
+
+
+/// 健康记录渠道覆盖（--dart-define=HH_CHANNEL=dev|ci|stable）。空则按版本名后缀解析。
+const hhChannelDefine = String.fromEnvironment('HH_CHANNEL');

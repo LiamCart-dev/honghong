@@ -19,6 +19,11 @@ import '../care/care_actions.dart';
 import '../care/care_log_row.dart';
 import '../care/sleep_wake_prompt.dart';
 import '../diary/diary_entry_card.dart';
+import '../health/health_entry_row.dart';
+import '../health/health_log_row.dart';
+import '../health/health_providers.dart';
+import '../health/temp_sheet.dart';
+import '../../domain/health/health_models.dart';
 import '../soothe/sleep_reminder.dart';
 import '../diary/diary_providers.dart' show summaryTriggerProvider;
 import '../../core/app_clock.dart';
@@ -114,6 +119,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         if (!night) const _AutoListenToggle(),
         const SizedBox(height: 18),
         _QuickGrid(active: active, justDiaper: _toastVisible, onTap: (t) => _tapType(t, active), onEnd: _end),
+        const HealthEntryRow(),
         if (night)
           const _VoiceHint()
         else ...[
@@ -777,7 +783,18 @@ class _Timeline extends ConsumerWidget {
     final all = ref.watch(recentLogsProvider).value ?? const <CareLog>[];
     final today = DateUtils.dateOnly(AppClock.now());
     final done = all.where((l) => l.endedAt != null && !l.startedAt.isBefore(today)).toList();
-    final rows = [...active, ...done];
+    final healthVisible = ref.watch(healthFeatureVisibleProvider);
+    final health = healthVisible
+        ? (ref.watch(todayHealthLogsProvider).value ?? const <HealthLog>[])
+        : const <HealthLog>[];
+    // 进行中置顶；其余护理+健康按时间降序交错
+    final rest = <Object>[...done, ...health]
+      ..sort((a, b) {
+        final ta = a is CareLog ? a.startedAt : (a as HealthLog).at;
+        final tb = b is CareLog ? b.startedAt : (b as HealthLog).at;
+        return tb.compareTo(ta);
+      });
+    final merged = <Object>[...active, ...rest];
     final hint = justDiaperId != null
         ? '换尿布不进入计时'
         : active.isNotEmpty
@@ -805,7 +822,7 @@ class _Timeline extends ConsumerWidget {
         Container(
           padding: const EdgeInsets.symmetric(vertical: 4),
           decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(18)),
-          child: rows.isEmpty
+          child: merged.isEmpty
               ? Padding(
                   padding: const EdgeInsets.symmetric(vertical: 18),
                   child: Center(
@@ -814,12 +831,30 @@ class _Timeline extends ConsumerWidget {
                 )
               : Column(
                   children: [
-                    for (var i = 0; i < rows.length; i++)
-                      _NewRowReveal(
-                        key: ValueKey(rows[i].id),
-                        isNew: rows[i].id == justDiaperId || rows[i].id == justSavedId,
-                        child: CareLogRow(log: rows[i], last: i == rows.length - 1, fresh: rows[i].id == justDiaperId, onTap: () => onTap(rows[i])),
-                      ),
+                    for (var i = 0; i < merged.length; i++)
+                      if (merged[i] is CareLog)
+                        _NewRowReveal(
+                          key: ValueKey((merged[i] as CareLog).id),
+                          isNew: (merged[i] as CareLog).id == justDiaperId || (merged[i] as CareLog).id == justSavedId,
+                          child: CareLogRow(
+                            log: merged[i] as CareLog,
+                            last: i == merged.length - 1,
+                            fresh: (merged[i] as CareLog).id == justDiaperId,
+                            onTap: () => onTap(merged[i] as CareLog),
+                          ),
+                        )
+                      else
+                        HealthLogRow(
+                          key: ValueKey((merged[i] as HealthLog).id),
+                          log: merged[i] as HealthLog,
+                          last: i == merged.length - 1,
+                          onTap: () {
+                            final h = merged[i] as HealthLog;
+                            if (h.kind == HealthKind.temperature.name) {
+                              showTempSheet(context, existing: h);
+                            }
+                          },
+                        ),
                   ],
                 ),
         ),
