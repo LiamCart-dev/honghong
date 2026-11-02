@@ -59,7 +59,7 @@ void main() {
     final rule = RuleBasedPredictor();
     final p = ModelPredictor(rule: rule, head: FixedHead([1, 0, 0, 0]), meta: meta());
     final r = await p.predict(const AudioFeatures(), ctx);
-    expect(r.predictorVersion, 'rule-1');
+    expect(r.predictorVersion, 'rule-2');
     expect(r.components!['skipped'], 'no_audio');
     final low = await p.predict(AudioFeatures(embedding: Float32List(1024), cryConfidence: 0.05), ctx);
     expect(low.components!['skipped'], 'low_cry_score');
@@ -85,7 +85,7 @@ void main() {
     expect(p[CryCause.diaper]! > base[CryCause.diaper]!, isTrue);
     expect(p[CryCause.holdMe], closeTo(base[CryCause.holdMe]!, 1e-9));
     expect(p.values.fold<double>(0, (a, b) => a + b), closeTo(1, 1e-9));
-    expect(r.predictorVersion, 'cls-t+rule-1');
+    expect(r.predictorVersion, 'cls-t+rule-2');
     // 不自信（最高 < 0.4）时不融合
     final unsure = await ModelPredictor(rule: rule, head: FixedHead([0.3, 0.25, 0.25, 0.2]), meta: meta(weight: 0.5)).predict(audio, ctx);
     expect(probs(unsure), base);

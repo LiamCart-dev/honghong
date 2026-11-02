@@ -1,19 +1,25 @@
 import 'dart:math' as math;
 
+import '../health/health_config.dart';
+import '../health/health_models.dart';
 import '../models/cry_cause.dart';
 import '../models/cry_context.dart';
 import 'cry_predictor.dart';
 
-/// 第一阶段：基于上下文的规则加权。
-/// 每个原因有基础分，再按各项时间间隔加分，最后 softmax 归一化。
+/// 基于上下文的规则加权（rule-2：可读健康快照）。
+/// 每个原因有基础分，再按各项时间间隔加分；有近期发烧或用药时给「不舒服」加分并温和压低其他原因；最后 softmax 归一化。
 /// [priors] 为该宝宝的个性化权重（由历史反馈统计得出），默认全 1。
 class RuleBasedPredictor implements CryPredictor {
-  RuleBasedPredictor({Map<CryCause, double>? priors}) : priors = priors ?? const {};
+  RuleBasedPredictor({
+    Map<CryCause, double>? priors,
+    this.healthConfig = kHealthConfig,
+  }) : priors = priors ?? const {};
 
   final Map<CryCause, double> priors;
+  final HealthConfig healthConfig;
 
   @override
-  String get version => 'rule-1';
+  String get version => 'rule-2';
 
   /// 按月龄估计的喂奶间隔（分钟）。
   static double feedIntervalMin(double ageMonths) {
@@ -36,6 +42,38 @@ class RuleBasedPredictor implements CryPredictor {
     if (d == null) return 0.5; // 没有记录：中性
     final r = d.inMinutes / typicalMin;
     return (r * r * 1.5).clamp(0.0, 3.0);
+  }
+
+  /// 窗口内是否有发烧读数 / 药品（补充剂不算）。阈值与窗口取自 [healthConfig]。
+  static ({bool fever, bool med}) uncomfortableSignals(
+    HealthSnapshot? snap,
+    HealthConfig config,
+  ) {
+    if (snap == null) return (fever: false, med: false);
+
+    var fever = false;
+    final feverWindow = config.feverWindow;
+    if (feverWindow != null) {
+      final since = snap.at.subtract(feverWindow);
+      for (final t in snap.temps) {
+        if (!t.at.isBefore(since) && !t.at.isAfter(snap.at) && config.isFeverReading(t)) {
+          fever = true;
+          break;
+        }
+      }
+    }
+
+    var med = false;
+    final medWindow = config.medicationWindow;
+    final medSince = snap.at.subtract(medWindow);
+    for (final m in snap.meds) {
+      if (m.kind == MedKind.drug && !m.at.isBefore(medSince) && !m.at.isAfter(snap.at)) {
+        med = true;
+        break;
+      }
+    }
+
+    return (fever: fever, med: med);
   }
 
   @override
@@ -77,6 +115,16 @@ class RuleBasedPredictor implements CryPredictor {
 
     raw[CryCause.holdMe] = 0.6;
     why[CryCause.holdMe] = '其他需求都满足时，可能只是想被抱';
+
+    // rule-2：近期发烧或用药 → 「不舒服」加分，温和压低其他原因（无快照/无信号时与 rule-1 分数路径一致）
+    final signal = uncomfortableSignals(c.health, healthConfig);
+    if (signal.fever || signal.med) {
+      final boost = healthConfig.uncomfortableBoost;
+      final damp = healthConfig.otherDampWhenUncomfortable;
+      raw.updateAll((k, v) => k == CryCause.diaper ? v + boost : v * damp);
+      why[CryCause.diaper] =
+          healthConfig.copy.predictorWhy(fever: signal.fever, med: signal.med);
+    }
 
     // 个性化先验
     raw.updateAll((k, v) => v * (priors[k] ?? 1.0));
