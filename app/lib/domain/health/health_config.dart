@@ -56,6 +56,9 @@ class HealthCopy {
     required this.pendingReviewBadge,
     required this.stageEmergencyLine,
     required this.symptomLabels,
+    required this.predictorWhyFeverAndMed,
+    required this.predictorWhyFever,
+    required this.predictorWhyMed,
   });
 
   final String bannerTitleUrgent;
@@ -82,6 +85,22 @@ class HealthCopy {
   final String pendingReviewBadge;
   final String stageEmergencyLine;
   final Map<Symptom, String> symptomLabels;
+
+  /// rule-2「为什么这么猜」：近期发烧 + 用药（审核 5.19）。
+  final String predictorWhyFeverAndMed;
+
+  /// rule-2：仅近期发烧。
+  final String predictorWhyFever;
+
+  /// rule-2：仅近期用药（不含补充剂）。
+  final String predictorWhyMed;
+
+  /// 按实际命中组合选「为什么这么猜」文案。
+  String predictorWhy({required bool fever, required bool med}) {
+    if (fever && med) return predictorWhyFeverAndMed;
+    if (fever) return predictorWhyFever;
+    return predictorWhyMed;
+  }
 }
 
 /// 健康记录集中配置。测试可注入假配置（阈值用变量 t，测 t−0.1 / t）。
@@ -107,6 +126,8 @@ class HealthConfig {
     required this.dangerSymptoms,
     required this.copy,
     required this.pendingReviewNotes,
+    this.uncomfortableBoost = 1.2,
+    this.otherDampWhenUncomfortable = 0.85,
   });
 
   /// 发烧阈值（℃）。null = 该档规则不触发。
@@ -159,6 +180,12 @@ class HealthConfig {
 
   /// 仍待确认/占位说明；非空时正式渠道隐藏功能（ADR-0009）。
   final List<String> pendingReviewNotes;
+
+  /// rule-2：命中近期发烧/用药时给「不舒服」(CryCause.diaper) 的原始分加值。
+  final double uncomfortableBoost;
+
+  /// rule-2：命中时其他原因的原始分乘数（温和压低；1 = 不压）。
+  final double otherDampWhenUncomfortable;
 
   List<String> get pendingReview => List.unmodifiable(pendingReviewNotes);
 
@@ -275,6 +302,9 @@ const kHealthConfig = HealthConfig(
       Symptom.nonBlanchingRash: '皮疹按压不褪色',
       Symptom.biliousOrBloodyVomit: '吐绿色或带血，或吃什么吐什么',
     },
+    predictorWhyFeverAndMed: '最近记录了体温和用药，结合宝宝以往的反馈综合判断。',
+    predictorWhyFever: '最近记录了体温，结合宝宝以往的反馈综合判断。',
+    predictorWhyMed: '最近记录了用药，结合宝宝以往的反馈综合判断。',
   ),
   pendingReviewNotes: [
     // 有值但公开发布前要儿科确认 → 正式渠道仍隐藏功能（ADR-0009）
