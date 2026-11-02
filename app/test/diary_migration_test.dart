@@ -8,7 +8,7 @@ import 'package:honghong/data/repositories/care_log_repository.dart';
 import 'package:honghong/domain/models/care_log_type.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-/// v4 → v5（妈咪日记）：老数据不丢、新列默认值正确、新表可用。
+/// v4 → 当前（经 v5 妈咪日记 / v6 健康记录）：老数据不丢、新列默认值正确、新表可用。
 /// fixtures/schema_v4.sql 是 v4 版本 AppDatabase.createAll() 导出的原始 DDL。
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
@@ -42,7 +42,7 @@ void main() {
     raw.close();
   }
 
-  test('v4 → v5 老数据不丢，新列有默认值', () async {
+  test('v4 → v6 老数据不丢，新列有默认值', () async {
     seedV4();
     final db = AppDatabase(NativeDatabase(file));
     addTearDown(db.close);
@@ -77,7 +77,7 @@ void main() {
     final repo = CareLogRepository(db);
     final s = await repo.startSession('b1', CareLogType.sleep);
     expect(s.id, 'l3');
-    expect(await db.customSelect('PRAGMA user_version').map((r) => r.read<int>('user_version')).getSingle(), 5);
+    expect(await db.customSelect('PRAGMA user_version').map((r) => r.read<int>('user_version')).getSingle(), 6);
   });
 
   test('迁移后的结构与全新安装一致', () async {

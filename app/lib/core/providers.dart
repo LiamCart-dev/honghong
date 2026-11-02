@@ -7,6 +7,7 @@ import '../data/repositories/care_log_repository.dart';
 import '../data/repositories/diary_repository.dart';
 import '../data/repositories/cry_event_repository.dart';
 import '../data/repositories/feedback_repository.dart';
+import '../data/repositories/health_log_repository.dart';
 import '../domain/context_builder.dart';
 import '../domain/models/care_log_type.dart';
 import '../domain/models/cry_cause.dart';
@@ -33,6 +34,8 @@ final cryEventRepositoryProvider =
     Provider((ref) => CryEventRepository(ref.watch(databaseProvider)));
 final feedbackRepositoryProvider =
     Provider((ref) => FeedbackRepository(ref.watch(databaseProvider)));
+final healthLogRepositoryProvider =
+    Provider((ref) => HealthLogRepository(ref.watch(databaseProvider)));
 
 /// 当前宝宝（v1 单宝宝）
 final currentBabyProvider = FutureProvider<Baby>(

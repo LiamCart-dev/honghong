@@ -143,3 +143,30 @@ class DailySummaries extends Table {
         {babyId, date}
       ];
 }
+
+/// 健康记录：体温 / 用药 / 症状（schema v6，ADR-0013：独立表，不扩展 care_logs.type）
+class HealthLogs extends Table {
+  TextColumn get id => text()();
+  TextColumn get babyId => text().references(Babies, #id)();
+  /// temperature | medication | symptom
+  TextColumn get kind => text()();
+  DateTimeColumn get at => dateTime()();
+  RealColumn get tempC => real().nullable()();
+  /// armpit | ear | forehead | rectal | oral（第一版 UI 只开放腋/肛；库允许多种便于以后）
+  TextColumn get tempSite => text().nullable()();
+  /// drug | supplement
+  TextColumn get medKind => text().nullable()();
+  TextColumn get medName => text().nullable()();
+  TextColumn get medDose => text().nullable()();
+  /// 症状枚举码 JSON 数组，如 ["cough","seizure"]
+  TextColumn get symptoms => text().nullable()();
+  TextColumn get symptomOther => text().nullable()();
+  TextColumn get note => text().nullable()();
+  // 同步四件套（与 care_logs 对齐；本 PR 不接云端）
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+  TextColumn get updatedBy => text().nullable()();
+  BoolColumn get deleted => boolean().withDefault(const Constant(false))();
+  BoolColumn get dirty => boolean().withDefault(const Constant(true))();
+  @override
+  Set<Column> get primaryKey => {id};
+}

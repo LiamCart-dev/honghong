@@ -96,6 +96,8 @@ class FamilySync {
       for (final b in locals) {
         await (_db.update(_db.careLogs)..where((l) => l.babyId.equals(b.id))).write(CareLogsCompanion(babyId: Value(id)));
         await (_db.update(_db.cryEvents)..where((e) => e.babyId.equals(b.id))).write(CryEventsCompanion(babyId: Value(id)));
+        // #1：健康记录也改挂，否则删旧宝宝会触发外键错误
+        await (_db.update(_db.healthLogs)..where((h) => h.babyId.equals(b.id))).write(HealthLogsCompanion(babyId: Value(id)));
         await (_db.delete(_db.babies)..where((x) => x.id.equals(b.id))).go();
       }
     });

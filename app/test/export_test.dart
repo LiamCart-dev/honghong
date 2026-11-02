@@ -8,6 +8,8 @@ import 'package:honghong/data/repositories/baby_repository.dart';
 import 'package:honghong/data/repositories/care_log_repository.dart';
 import 'package:honghong/data/repositories/cry_event_repository.dart';
 import 'package:honghong/data/repositories/feedback_repository.dart';
+import 'package:honghong/data/repositories/health_log_repository.dart';
+import 'package:honghong/domain/health/health_models.dart';
 import 'package:honghong/domain/models/care_log_type.dart';
 import 'package:honghong/domain/models/cry_cause.dart';
 import 'package:honghong/domain/models/cry_context.dart';
@@ -30,6 +32,13 @@ void main() {
     final eid = await CryEventRepository(db).save(
         babyId: baby.id, startedAt: ctx.at, durationMs: 8000, context: ctx, prediction: pred, audioPath: wav.path);
     await FeedbackRepository(db).save(eid, CryCause.gas);
+    await HealthLogRepository(db).add(
+      babyId: baby.id,
+      kind: HealthKind.temperature,
+      at: DateTime(2026, 10, 13, 10),
+      tempC: 37.6,
+      tempSite: TempSite.armpit,
+    );
 
     final r = await ExportService(db).writeZip(Directory('${tmp.path}/out'), now: DateTime(2026, 10, 13, 21, 30));
     expect(r.path, endsWith('honghong-export-20261013-2130.zip'));
@@ -42,6 +51,10 @@ void main() {
     expect(ev['audio_file'], 'recordings/123.wav');
     expect((ev['context'] as Map)['baby_age_months'], 1);
     expect(((json['feedbacks'] as List).single as Map)['resolved_cause'], 'gas');
+    final hl = (json['health_logs'] as List).single as Map<String, dynamic>;
+    expect(hl['kind'], 'temperature');
+    expect(hl['temp_c'], 37.6);
+    expect(hl['temp_site'], 'armpit');
     await db.close();
     await tmp.delete(recursive: true);
   });
