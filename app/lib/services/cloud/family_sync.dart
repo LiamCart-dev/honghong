@@ -23,6 +23,7 @@ class FamilySync {
   String get kFamilyId => '${keyPrefix}family_id';
   String get kCursorLogs => '${keyPrefix}family_cursor_logs';
   String get kCursorCries => '${keyPrefix}family_cursor_cries';
+  String get kCursorHealth => '${keyPrefix}family_cursor_health';
   String get kLastSync => '${keyPrefix}family_last_sync';
 
   String? get familyId => _prefs.getString(kFamilyId);
@@ -61,7 +62,7 @@ class FamilySync {
   }
 
   Future<void> clearLocalFamily() async {
-    for (final k in [kFamilyId, kCursorLogs, kCursorCries, kLastSync]) {
+    for (final k in [kFamilyId, kCursorLogs, kCursorCries, kCursorHealth, kLastSync]) {
       await _prefs.remove(k);
     }
   }
@@ -70,14 +71,17 @@ class FamilySync {
     await _prefs.setString(kFamilyId, fid);
     await _prefs.remove(kCursorLogs);
     await _prefs.remove(kCursorCries);
+    await _prefs.remove(kCursorHealth);
   }
 
   Future<void> _markAllDirty() async {
     final now = AppClock.now();
     await (_db.update(_db.careLogs)..where((l) => l.updatedAt.isNull())).write(CareLogsCompanion(updatedAt: Value(now)));
     await (_db.update(_db.cryEvents)..where((e) => e.updatedAt.isNull())).write(CryEventsCompanion(updatedAt: Value(now)));
+    await (_db.update(_db.healthLogs)..where((h) => h.updatedAt.isNull())).write(HealthLogsCompanion(updatedAt: Value(now)));
     await _db.update(_db.careLogs).write(const CareLogsCompanion(dirty: Value(true)));
     await _db.update(_db.cryEvents).write(const CryEventsCompanion(dirty: Value(true)));
+    await _db.update(_db.healthLogs).write(const HealthLogsCompanion(dirty: Value(true)));
   }
 
   /// 用家庭的宝宝替换本机宝宝：本机记录改挂到家庭宝宝名下
@@ -110,11 +114,27 @@ class FamilySync {
     await _pushBaby();
     await _pushLogs(fid);
     await _pushCries(fid);
+    await _pushHealth(fid); // 0005 未执行时内部跳过，其他同步照常
     var n = await _pullLogs(fid);
     n += await _pullCries(fid);
+    n += await _pullHealth(fid);
     await _pullBaby(fid);
     await _prefs.setString(kLastSync, AppClock.now().toIso8601String());
     return n;
+  }
+
+  /// 线上还没跑 0005：找不到 push_health_logs / shared_health_logs → 只跳过健康同步
+  static bool _isHealthMigrationMissing(CloudException e) {
+    final m = e.message;
+    return e.code == 'PGRST202' ||
+        e.code == 'PGRST205' ||
+        e.code == '42P01' ||
+        m.contains('push_health_logs') ||
+        m.contains('shared_health_logs') ||
+        m.contains('Could not find the function') ||
+        m.contains('找不到函数') ||
+        m.contains('does not exist') ||
+        m.contains('404');
   }
 
   Future<void> _pushBaby() async {
@@ -321,5 +341,84 @@ class FamilySync {
           gender: r.containsKey('gender') ? Value(r['gender'] as String?) : const Value.absent(),
           updatedAt: Value(remoteAt)));
     }
+  }
+
+  static Map<String, dynamic> healthRow(HealthLog h, String fid) => {
+        'id': h.id,
+        'family_id': fid,
+        'baby_id': h.babyId,
+        'kind': h.kind,
+        'at': _ts(h.at),
+        'temp_c': h.tempC,
+        'temp_site': h.tempSite,
+        'med_kind': h.medKind,
+        'med_name': h.medName,
+        'med_dose': h.medDose,
+        'symptoms': h.symptoms,
+        'symptom_other': h.symptomOther,
+        'note': h.note,
+        'updated_at': _ts(h.updatedAt ?? h.at),
+        'deleted': h.deleted,
+      };
+
+  Future<void> _pushHealth(String fid) async {
+    final rows = await (_db.select(_db.healthLogs)..where((h) => h.dirty)).get();
+    for (var i = 0; i < rows.length; i += 200) {
+      final batch = rows.sublist(i, i + 200 > rows.length ? rows.length : i + 200);
+      try {
+        await _api.pushHealthLogs([for (final h in batch) healthRow(h, fid)]);
+      } on CloudException catch (e) {
+        if (_isHealthMigrationMissing(e)) return; // 保持 dirty，等 0005
+        rethrow;
+      }
+      for (final h in batch) {
+        await (_db.update(_db.healthLogs)
+              ..where((x) => x.id.equals(h.id) & x.updatedAt.equalsNullable(h.updatedAt)))
+            .write(const HealthLogsCompanion(dirty: Value(false)));
+      }
+    }
+  }
+
+  Future<int> _pullHealth(String fid) async {
+    final List<Map<String, dynamic>> rows;
+    try {
+      rows = await _api.pullHealthLogs(fid, _prefs.getString(kCursorHealth));
+    } on CloudException catch (e) {
+      if (_isHealthMigrationMissing(e)) return 0;
+      rethrow;
+    }
+    var n = 0;
+    for (final r in rows) {
+      final id = r['id'] as String;
+      final remoteAt = _parse(r['updated_at'])!;
+      final local = await (_db.select(_db.healthLogs)..where((h) => h.id.equals(id))).getSingleOrNull();
+      if (local == null || _wins(remoteAt, local.updatedAt, local.dirty)) {
+        await _applyHealth(r, remoteAt);
+        n++;
+      }
+      await _prefs.setString(kCursorHealth, r['server_updated_at'] as String);
+    }
+    return n;
+  }
+
+  Future<void> _applyHealth(Map<String, dynamic> r, DateTime remoteAt) async {
+    await _db.into(_db.healthLogs).insertOnConflictUpdate(HealthLogsCompanion.insert(
+          id: r['id'] as String,
+          babyId: r['baby_id'] as String,
+          kind: r['kind'] as String,
+          at: _parse(r['at'])!,
+          tempC: Value((r['temp_c'] as num?)?.toDouble()),
+          tempSite: Value(r['temp_site'] as String?),
+          medKind: Value(r['med_kind'] as String?),
+          medName: Value(r['med_name'] as String?),
+          medDose: Value(r['med_dose'] as String?),
+          symptoms: Value(r['symptoms'] as String?),
+          symptomOther: Value(r['symptom_other'] as String?),
+          note: Value(r['note'] as String?),
+          updatedAt: Value(remoteAt),
+          updatedBy: Value(r['updated_by'] == _api.userId ? null : r['updated_by'] as String?),
+          deleted: Value(r['deleted'] as bool? ?? false),
+          dirty: const Value(false),
+        ));
   }
 }

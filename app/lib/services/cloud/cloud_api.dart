@@ -31,8 +31,10 @@ abstract class CloudApi {
   Future<void> pushBaby(Map<String, dynamic> baby);
   Future<void> pushCareLogs(List<Map<String, dynamic>> rows);
   Future<void> pushCryEvents(List<Map<String, dynamic>> rows);
+  Future<void> pushHealthLogs(List<Map<String, dynamic>> rows);
   Future<List<Map<String, dynamic>>> pullCareLogs(String familyId, String? since);
   Future<List<Map<String, dynamic>>> pullCryEvents(String familyId, String? since);
+  Future<List<Map<String, dynamic>>> pullHealthLogs(String familyId, String? since);
 
   // 参与改进（研究数据，按设备隔离）
   Future<void> upsertDevice({required String appVersion, required DateTime consentAt});

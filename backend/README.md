@@ -27,13 +27,15 @@ location /auth/v1/ { proxy_pass http://127.0.0.1:8000; }
 
 ## 重建
 
-见 `redeploy/RUNBOOK.md` 和 `redeploy/redeploy.sh`（一条命令在干净服务器上全新部署，生成新密钥，执行 0001+0002，设置 GitHub secret）。
+见 `redeploy/RUNBOOK.md` 和 `redeploy/redeploy.sh`（一条命令在干净服务器上全新部署，生成新密钥，执行 0001–0005，设置 GitHub secret）。
+**存量库**：`0004_diary.sql` / `0005_health.sql` 须由 DevOps 在发版前按序手动执行（执行前找 Liam）；开发不自己跑。
 
 ## 当前部署：nc_am（2026-10-14 全新重建）
 
 - 2026-10-14 用 `redeploy/redeploy.sh` 全新部署：旧栈和数据卷、旧备份全部删除，JWT secret / anon / service_role key / 数据库密码 / Studio 账号全部重新生成（只在服务器 `.env` 和 bot 私有存储）
 - 网关 `127.0.0.1:8000`、Studio `127.0.0.1:54323`；OpenResty 站点和 Cloudflare tunnel 沿用（只放行 /auth/v1、/rest/v1、/storage/v1）
 - 已执行 0001 + 0002；公网验证：匿名注册、家庭创建/加入、外人隔离、Storage 按设备目录隔离均通过，测试用户已删除
+- **待执行（发版前找 Liam）**：`0004_diary.sql`、`0005_health.sql`（顺序 0004→0005；0005 不依赖 0004，但上线清单仍建议先 0004）。客户端在未跑 0005 时会跳过健康同步，其他同步照常。
 - 备份：`redeploy/backup.sh` → `/opt/honghong-supabase/backup.sh`，crontab 每天 03:30（服务器时间 CEST）
 
 ## 历史记录：妈咪日记 AI 网关 P0 首次上线（2026-10-14，已过时）
