@@ -7,7 +7,7 @@ import '../../core/app_clock.dart';
 import '../../domain/health/health_models.dart';
 import '../db/app_database.dart';
 
-/// 健康记录本地仓库（#1 PR-B）。本 PR 不接云端同步。
+/// 健康记录本地仓库（#1 PR-B）。云端同步见 FamilySync（#1 PR-C）。
 class HealthLogRepository {
   HealthLogRepository(this._db);
   final AppDatabase _db;

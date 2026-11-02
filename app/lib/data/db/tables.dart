@@ -162,7 +162,7 @@ class HealthLogs extends Table {
   TextColumn get symptoms => text().nullable()();
   TextColumn get symptomOther => text().nullable()();
   TextColumn get note => text().nullable()();
-  // 同步四件套（与 care_logs 对齐；本 PR 不接云端）
+  // 同步四件套（与 care_logs 对齐；家庭同步字段；推拉见 FamilySync）
   DateTimeColumn get updatedAt => dateTime().nullable()();
   TextColumn get updatedBy => text().nullable()();
   BoolColumn get deleted => boolean().withDefault(const Constant(false))();

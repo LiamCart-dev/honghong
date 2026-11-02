@@ -9,12 +9,15 @@ class FakeServer {
   final babies = <String, Map<String, dynamic>>{};
   final logs = <String, Map<String, dynamic>>{};
   final cries = <String, Map<String, dynamic>>{};
+  final health = <String, Map<String, dynamic>>{};
   final research = <String, Map<String, dynamic>>{};
   final clips = <String, Uint8List>{};
   final models = <String, Uint8List>{}; // storage path -> bytes
   Map<String, dynamic>? eligible; // eligible_model('classifier') 的返回
   /// 模拟线上未跑 0004：带 gender 的 push_baby 报 PGRST202
   bool rejectGenderInPush = false;
+  /// 模拟线上未跑 0005：健康推拉报 PGRST202 / 404
+  bool rejectHealthSync = false;
   int _seq = 0, _n = 0;
   String _stamp() => (++_seq).toString().padLeft(12, '0');
 
@@ -125,6 +128,18 @@ class FakeCloud implements CloudApi {
     }
   }
 
+  @override
+  Future<void> pushHealthLogs(List<Map<String, dynamic>> rows) async {
+    _net();
+    if (s.rejectHealthSync) {
+      throw CloudException('服务器出错：Could not find the function public.push_health_logs', code: 'PGRST202');
+    }
+    for (final r in rows) {
+      _check(r['family_id']);
+      s.upsertLww(s.health, {...r, 'updated_by': uid});
+    }
+  }
+
   List<Map<String, dynamic>> _pull(Map<String, Map<String, dynamic>> t, String fid, String? since) {
     _net();
     _check(fid);
@@ -137,6 +152,13 @@ class FakeCloud implements CloudApi {
   Future<List<Map<String, dynamic>>> pullCareLogs(String familyId, String? since) async => _pull(s.logs, familyId, since);
   @override
   Future<List<Map<String, dynamic>>> pullCryEvents(String familyId, String? since) async => _pull(s.cries, familyId, since);
+  @override
+  Future<List<Map<String, dynamic>>> pullHealthLogs(String familyId, String? since) async {
+    if (s.rejectHealthSync) {
+      throw CloudException('服务器出错：relation "shared_health_logs" does not exist', code: 'PGRST205');
+    }
+    return _pull(s.health, familyId, since);
+  }
 
   @override
   Future<void> upsertDevice({required String appVersion, required DateTime consentAt}) async => _net();

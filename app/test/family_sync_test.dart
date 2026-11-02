@@ -8,6 +8,8 @@ import 'package:honghong/data/repositories/baby_repository.dart';
 import 'package:honghong/data/repositories/care_log_repository.dart';
 import 'package:honghong/data/repositories/cry_event_repository.dart';
 import 'package:honghong/data/repositories/feedback_repository.dart';
+import 'package:honghong/data/repositories/health_log_repository.dart';
+import 'package:honghong/domain/health/health_models.dart';
 import 'package:honghong/domain/models/care_detail.dart';
 import 'package:honghong/domain/models/care_log_type.dart';
 import 'package:honghong/domain/models/cry_cause.dart';
@@ -237,6 +239,71 @@ void main() {
     expect(server.clips, isEmpty);
     expect(up.enabled, isFalse);
     await dir.delete(recursive: true);
+  });
+
+
+  test('健康记录推拉、游标、软删除能同步给家人', () async {
+    final baby = await BabyRepository(dbA).ensureDefault();
+    final repoA = HealthLogRepository(dbA);
+    final id = await repoA.add(
+      babyId: baby.id,
+      kind: HealthKind.temperature,
+      at: DateTime(2026, 11, 2, 8),
+      tempC: 37.6,
+      tempSite: TempSite.armpit,
+    );
+    await a.create(name: '爸爸', avatar: 'dad');
+    await b.join(code: server.invites.keys.single, name: '妈妈', avatar: 'mom');
+    await a.sync();
+    await b.sync();
+
+    final pulled = await HealthLogRepository(dbB).byId(id);
+    expect(pulled, isNotNull);
+    expect(pulled!.tempC, 37.6);
+    expect(pulled.tempSite, 'armpit');
+    expect(pulled.dirty, isFalse);
+    expect(a.lastSync, isNotNull);
+    // 游标已前进
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString(a.kCursorHealth), isNotNull);
+
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+    await repoA.softDelete(id);
+    await a.sync();
+    await b.sync();
+    expect((await HealthLogRepository(dbB).byId(id))!.deleted, isTrue);
+    expect(await HealthLogRepository(dbB).list(babyId: baby.id), isEmpty, reason: 'list 默认排除软删除');
+  });
+
+  test('线上未跑 0005 时跳过健康同步，护理同步照常，健康保持 dirty', () async {
+    final baby = await BabyRepository(dbA).ensureDefault();
+    final careId = await CareLogRepository(dbA).add(baby.id, CareLogType.feed, at: DateTime(2026, 11, 2, 7));
+    final healthId = await HealthLogRepository(dbA).add(
+      babyId: baby.id,
+      kind: HealthKind.symptom,
+      at: DateTime(2026, 11, 2, 8),
+      symptoms: {Symptom.cough},
+    );
+    // create/join 内部会 sync，必须在此之前模拟未跑 0005
+    server.rejectHealthSync = true;
+    await a.create(name: '爸爸', avatar: 'dad');
+    await b.join(code: server.invites.keys.single, name: '妈妈', avatar: 'mom');
+
+    await a.sync(); // 不应抛
+    await b.sync();
+
+    expect(server.health, isEmpty, reason: '0005 未执行时健康不上云');
+    expect(server.logs.containsKey(careId), isTrue, reason: '护理照常推送');
+    expect((await CareLogRepository(dbB).byId(careId)), isNotNull, reason: '家人能拉到护理');
+    expect(await HealthLogRepository(dbB).byId(healthId), isNull, reason: '健康未同步');
+    expect((await HealthLogRepository(dbA).byId(healthId))!.dirty, isTrue, reason: '保持 dirty 等迁移');
+
+    // 迁移「上线」后下次同步能推上去
+    server.rejectHealthSync = false;
+    await a.sync();
+    await b.sync();
+    expect(await HealthLogRepository(dbB).byId(healthId), isNotNull);
+    expect((await HealthLogRepository(dbA).byId(healthId))!.dirty, isFalse);
   });
 
   test('trimWav：短的不变长，坏数据返回 null', () {

@@ -108,10 +108,17 @@ class SupabaseCloudApi implements CloudApi {
   @override
   Future<void> pushCryEvents(List<Map<String, dynamic>> rows) => _rpc<dynamic>('push_cry_events', {'rows': rows});
 
+  @override
+  Future<void> pushHealthLogs(List<Map<String, dynamic>> rows) => _rpc<dynamic>('push_health_logs', {'rows': rows});
+
   Future<List<Map<String, dynamic>>> _pull(String table, String familyId, String? since) async {
-    var q = _c.from(table).select().eq('family_id', familyId);
-    if (since != null) q = q.gt('server_updated_at', since);
-    return List<Map<String, dynamic>>.from(await q.order('server_updated_at').limit(1000));
+    try {
+      var q = _c.from(table).select().eq('family_id', familyId);
+      if (since != null) q = q.gt('server_updated_at', since);
+      return List<Map<String, dynamic>>.from(await q.order('server_updated_at').limit(1000));
+    } on PostgrestException catch (e) {
+      throw CloudException('服务器出错：${e.message}', code: e.code);
+    }
   }
 
   @override
@@ -119,6 +126,9 @@ class SupabaseCloudApi implements CloudApi {
 
   @override
   Future<List<Map<String, dynamic>>> pullCryEvents(String familyId, String? since) => _pull('shared_cry_events', familyId, since);
+
+  @override
+  Future<List<Map<String, dynamic>>> pullHealthLogs(String familyId, String? since) => _pull('shared_health_logs', familyId, since);
 
   @override
   Future<void> upsertDevice({required String appVersion, required DateTime consentAt}) async {
