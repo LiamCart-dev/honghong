@@ -10,9 +10,12 @@
 // - 猛长期：只用 AAP 的 7–10 天、3–6 周，不提 3/4/6/9 个月；
 // - 睡眠模式变化：不用"睡眠倒退"。
 //
+// 急症相关 5 处字符串已迁到 domain/health/health_config.dart 的 HealthStageLegacyCopy
+//（字面不变；PR-H 再按最终规则改）。
 // 纯 Dart（不依赖 Flutter），可以用 `dart run tool/export_stage_copy.dart` 导出 markdown 给人看。
 
 import '../../domain/stages/cry_stage.dart';
+import '../../domain/health/health_config.dart' show HealthStageLegacyCopy;
 
 class StageSource {
   const StageSource({
@@ -91,8 +94,7 @@ const stageCommonNotes = [
 const stagePretermNote = '早产宝宝的时间可能会晚一些，以矫正月龄为准。';
 
 /// 每个阶段一节末尾固定的急症提示，醒目样式（审阅第 1 条）。0–3 个月发烧本身就是急症。
-const stageEmergencyLine =
-    '出现这些情况请立即就医：3 个月以下宝宝体温 ≥38℃；呼吸急促或费力、口唇发紫；抽搐；拒奶或吃奶明显变差；精神很差、叫不醒。';
+const stageEmergencyLine = HealthStageLegacyCopy.stageEmergencyLine;
 
 // ───────── 来源（引文照抄核实报告） ─────────
 
@@ -214,7 +216,7 @@ const stageCopy = <CryStage, StageCopy>{
     ],
     keyFact: '绝不能摇晃宝宝。再累、再着急也不要摇晃，摇晃可能造成严重的脑损伤。',
     seeDoctor: [
-      '体温 ≥38℃（3 个月以下要立即就医）', // [审7]
+      HealthStageLegacyCopy.cryingPeakFeverSeeDoctor, // [审7] → health_config
       '呕吐（尤其是喷射状、绿色或带血）',
       '大便带血',
       '一阵一阵地剧烈哭闹，还伴有呕吐或果酱样大便', // [审8]
@@ -245,9 +247,9 @@ const stageCopy = <CryStage, StageCopy>{
       '不要用含苯佐卡因或利多卡因的止痛凝胶，也不要给宝宝戴琥珀项链、手链之类的出牙饰物（有窒息和勒伤风险）',
       '第一颗牙长出来以后，可以带宝宝做第一次口腔检查', // [审14]（国家疾控局）
     ],
-    keyFact: '出牙不会引起 38℃ 及以上的发烧。体温 ≥38℃ 时不要当成出牙，请及时就医。',
+    keyFact: HealthStageLegacyCopy.teethingKeyFact,
     seeDoctor: [
-      '体温 ≥38℃',
+      HealthStageLegacyCopy.teethingFeverSeeDoctor,
       '特别难受、怎么哄都不好，或精神差',
       '吃奶明显变少',
       '腹泻、呕吐、出皮疹——这些也不是出牙引起的，请按生病来对待', // [审12]（NHS）
@@ -271,7 +273,7 @@ const stageCopy = <CryStage, StageCopy>{
       '尿布变少：出生 5 天后，每天湿尿布少于 6 片', // [审2]
       '出生 2 周还没回到出生体重，或者体重不长', // [审3]
       '皮肤或眼白发黄，越来越黄或者范围变大', // [审4]
-      '体温 ≥38℃，或者吃奶无力、精神差', // [审5]
+      HealthStageLegacyCopy.growthSpurtFeverSeeDoctor, // [审5] → health_config
       '哭闹和平时不一样，或者好几天都不缓解',
     ],
     sources: [_aapFirstMonth, _nhcFeeding, _cdcInfantFeeding],
