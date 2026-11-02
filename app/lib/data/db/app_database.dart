@@ -9,7 +9,7 @@ import 'tables.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [Babies, CareLogs, CryEvents, Feedbacks, ModelVersions, DiaryInputs, DiaryCards, DailySummaries])
+@DriftDatabase(tables: [Babies, CareLogs, CryEvents, Feedbacks, ModelVersions, DiaryInputs, DiaryCards, DailySummaries, HealthLogs])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _open());
 
@@ -17,7 +17,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.memory() : super(NativeDatabase.memory());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -25,6 +25,7 @@ class AppDatabase extends _$AppDatabase {
           await m.createAll();
           await customStatement(activeSessionIndexSql);
           await customStatement(diaryIndexesSql);
+          await customStatement(healthIndexesSql);
         },
         onUpgrade: (m, from, to) async {
           if (from < 2) await migrateV1ToV2(this);
@@ -51,6 +52,11 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(dailySummaries);
             await customStatement(diaryIndexesSql);
           }
+          if (from < 6) {
+            // #1 健康记录：独立表 health_logs（ADR-0013）
+            await m.createTable(healthLogs);
+            await customStatement(healthIndexesSql);
+          }
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
@@ -68,6 +74,10 @@ const activeSessionIndexSql =
 /// 时间线按宝宝+归属日期查日记卡（schema v5）
 const diaryIndexesSql =
     'CREATE INDEX IF NOT EXISTS diary_cards_baby_date ON diary_cards (baby_id, diary_date)';
+
+/// 健康记录按宝宝+时间查（schema v6）
+const healthIndexesSql =
+    'CREATE INDEX IF NOT EXISTS health_logs_baby_at ON health_logs (baby_id, at)';
 
 /// v1 → v2：v1 的喂奶/拍嗝/换尿布是"点一下记一个时间点"（ended_at 为空），
 /// v2 起 ended_at 为空表示"进行中"。先把旧的时间点记录补成已结束，

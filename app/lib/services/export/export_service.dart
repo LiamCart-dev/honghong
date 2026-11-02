@@ -9,7 +9,7 @@ import 'package:path/path.dart' as p;
 import '../../data/db/app_database.dart';
 import '../../core/app_clock.dart';
 
-/// 导出录音和标注：data.json（宝宝、护理记录、哭声事件、反馈）+ recordings/*.wav，打成一个 zip。
+/// 导出录音和标注：data.json（宝宝、护理记录、哭声事件、反馈、健康记录）+ recordings/*.wav，打成一个 zip。
 /// 用于第三阶段拿自家宝宝的数据训练模型。
 class ExportService {
   ExportService(this._db);
@@ -23,6 +23,7 @@ class ExportService {
     final logs = await (_db.select(_db.careLogs)..where((l) => l.deleted.not())).get();
     final cries = await (_db.select(_db.cryEvents)..where((e) => e.deleted.not())).get();
     final fbs = await _db.select(_db.feedbacks).get();
+    final health = await (_db.select(_db.healthLogs)..where((h) => h.deleted.not())).get();
     Object? js(String? s) {
       if (s == null) return null;
       try {
@@ -74,6 +75,23 @@ class ExportService {
             'minutes_to_soothe': f.minutesToSoothe,
             'note': f.note,
             'created_at': iso(f.createdAt),
+          },
+      ],
+      'health_logs': [
+        for (final h in health)
+          {
+            'id': h.id,
+            'baby_id': h.babyId,
+            'kind': h.kind,
+            'at': iso(h.at),
+            'temp_c': h.tempC,
+            'temp_site': h.tempSite,
+            'med_kind': h.medKind,
+            'med_name': h.medName,
+            'med_dose': h.medDose,
+            'symptoms': js(h.symptoms),
+            'symptom_other': h.symptomOther,
+            'note': h.note,
           },
       ],
     };
