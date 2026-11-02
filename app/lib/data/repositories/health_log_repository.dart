@@ -4,7 +4,9 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/app_clock.dart';
+import '../../domain/health/health_config.dart';
 import '../../domain/health/health_models.dart';
+import '../../domain/health/health_snapshot_codec.dart';
 import '../db/app_database.dart';
 
 /// 健康记录本地仓库（#1 PR-B）。云端同步见 FamilySync（#1 PR-C）。
@@ -169,6 +171,54 @@ class HealthLogRepository {
   static String? _encodeSymptoms(Set<Symptom>? symptoms) {
     if (symptoms == null || symptoms.isEmpty) return null;
     return jsonEncode([for (final s in symptoms) s.name]);
+  }
+
+
+  /// 哭声分析用：把 [at] 前回看窗口内的未删记录收成 [HealthSnapshot]（#1 PR-F）。
+  Future<HealthSnapshot> snapshotAt({
+    required String babyId,
+    required DateTime at,
+    HealthConfig config = kHealthConfig,
+  }) async {
+    final lookback = healthSnapshotLookback(config);
+    final from = at.subtract(lookback);
+    final rows = await list(babyId: babyId, from: from, to: at);
+    return healthSnapshotFromLogs(rows, at: at);
+  }
+
+  /// 纯函数入口，便于单测。
+  static HealthSnapshot healthSnapshotFromLogs(
+    List<HealthLog> rows, {
+    required DateTime at,
+  }) {
+    final temps = <TempReading>[];
+    final meds = <MedReading>[];
+    final symptoms = <SymptomReading>[];
+    for (final h in rows) {
+      if (h.deleted) continue;
+      if (h.at.isAfter(at)) continue;
+      switch (HealthKind.values.asNameMap()[h.kind]) {
+        case HealthKind.temperature:
+          final site = TempSite.values.asNameMap()[h.tempSite ?? ''];
+          final c = h.tempC;
+          if (site != null && c != null) {
+            temps.add(TempReading(at: h.at, celsius: c, site: site));
+          }
+        case HealthKind.medication:
+          final kind = MedKind.values.asNameMap()[h.medKind ?? ''];
+          if (kind != null) {
+            meds.add(MedReading(at: h.at, kind: kind, name: h.medName ?? ''));
+          }
+        case HealthKind.symptom:
+          final set = decodeSymptoms(h.symptoms);
+          if (set.isNotEmpty) {
+            symptoms.add(SymptomReading(at: h.at, symptoms: set));
+          }
+        case null:
+          break;
+      }
+    }
+    return HealthSnapshot(at: at, temps: temps, meds: meds, symptoms: symptoms);
   }
 
   /// 解析库里的 symptoms JSON；坏数据返回空集合。

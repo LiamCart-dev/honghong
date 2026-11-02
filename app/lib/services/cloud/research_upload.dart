@@ -9,6 +9,7 @@ import '../../data/db/app_database.dart';
 import '../audio/wav_trim.dart';
 import 'cloud_api.dart';
 import '../../core/app_clock.dart';
+import '../../domain/health/health_snapshot_codec.dart';
 
 /// "参与改进"：只上传有反馈、且录音在本机的哭声（16kHz 单声道，最长 30 秒）+ 标注。
 /// 默认关闭；只在 Wi-Fi 下传；失败的下次再试（以本地 uuid 为主键，重复上传幂等）。
@@ -77,7 +78,9 @@ class ResearchUploader {
           'duration_ms': e.durationMs,
           'clip_path': clip,
           'cry_confidence': e.cryConfidence,
-          'context': jsonDecode(e.contextJson),
+          'context': stripHealthFromResearchContext(
+            Map<String, dynamic>.from(jsonDecode(e.contextJson) as Map),
+          ),
           'prediction': jsonDecode(e.predictionJson),
           'predictor_version': e.predictorVersion,
         });

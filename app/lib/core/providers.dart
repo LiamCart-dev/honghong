@@ -115,11 +115,15 @@ class CryFlow {
   }) async {
     final baby = await _ref.read(currentBabyProvider.future);
     final logs = await _ref.read(careLogRepositoryProvider).latestByType(baby.id);
+    final health = await _ref.read(healthLogRepositoryProvider).snapshotAt(
+      babyId: baby.id,
+      at: startedAt,
+    );
     final ctx = buildCryContext(
       now: startedAt,
       birthDate: baby.birthDate,
       latest: logs.map((k, v) => MapEntry(k, LastLog(v.startedAt, v.endedAt))),
-    );
+    ).withHealth(health);
     if (audio.embedding == null && audioPath != null) {
       try {
         final emb = await _ref.read(cryEmbedderProvider.future);
