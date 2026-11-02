@@ -25,4 +25,15 @@ void main() {
       expect(File('assets/icons/svg/$n.svg').existsSync(), isTrue);
     }
   });
+
+  test('健康记录图标已登记', () {
+    expect(AppIcon.healthTemp.asset, 'assets/icons/health_temp.png');
+    expect(AppIcon.healthMed.asset, 'assets/icons/health_med.png');
+    expect(AppIcon.healthSymptom.asset, 'assets/icons/health_symptom.png');
+    for (final n in ['health_temp', 'health_med', 'health_symptom']) {
+      expect(File('assets/icons/svg/$n.svg').existsSync(), isTrue);
+      expect(File('assets/icons/2.0x/$n.png').existsSync(), isTrue);
+      expect(File('assets/icons/3.0x/$n.png').existsSync(), isTrue);
+    }
+  });
 }
