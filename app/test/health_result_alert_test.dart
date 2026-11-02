@@ -10,7 +10,6 @@ import 'package:honghong/core/providers.dart';
 import 'package:honghong/core/theme/app_theme.dart';
 import 'package:honghong/data/db/app_database.dart';
 import 'package:honghong/domain/health/health.dart';
-import 'package:honghong/domain/health/health_channel.dart';
 import 'package:honghong/domain/models/cry_cause.dart';
 import 'package:honghong/domain/models/cry_context.dart';
 import 'package:honghong/domain/predictor/cry_predictor.dart';
@@ -51,8 +50,8 @@ void main() {
     final prediction = Prediction(
       ranked: [
         CauseScore(top, 0.55, '测试'),
-        CauseScore(CryCause.hungry, 0.3, '测试'),
-        CauseScore(CryCause.sleepy, 0.15, '测试'),
+        const CauseScore(CryCause.hungry, 0.3, '测试'),
+        const CauseScore(CryCause.sleepy, 0.15, '测试'),
       ],
       predictorVersion: 'test',
     );
@@ -69,7 +68,7 @@ void main() {
 
     final router = GoRouter(
       routes: [
-        GoRoute(path: '/', builder: (_, __) => const ResultPage(eventId: id)),
+        GoRoute(path: '/', builder: (_, _) => const ResultPage(eventId: id)),
       ],
     );
     await tester.pumpWidget(
