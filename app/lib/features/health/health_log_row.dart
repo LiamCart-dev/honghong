@@ -5,10 +5,12 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_icon.dart';
 import '../../core/widgets/hh_widgets.dart';
 import '../../data/db/app_database.dart';
+import '../../data/repositories/health_log_repository.dart';
+import '../../domain/health/health_config.dart';
 import '../../domain/health/health_models.dart';
 import 'temp_input.dart';
 
-/// 首页「今天的记录」健康行（CareLogRow 风格）。
+/// 首页「今天的记录」/「全部记录」健康行（CareLogRow 风格）。
 class HealthLogRow extends StatelessWidget {
   const HealthLogRow({super.key, required this.log, this.last = false, this.onTap});
   final HealthLog log;
@@ -17,7 +19,7 @@ class HealthLogRow extends StatelessWidget {
 
   static final _hm = DateFormat('HH:mm');
 
-  static (AppIcon icon, String title, String subtitle) lines(HealthLog log) {
+  static (AppIcon icon, String title, String subtitle) lines(HealthLog log, {HealthConfig config = kHealthConfig}) {
     final kind = HealthKind.values.byName(log.kind);
     return switch (kind) {
       HealthKind.temperature => (
@@ -30,11 +32,18 @@ class HealthLogRow extends StatelessWidget {
           '用药 · ${log.medName ?? ''}',
           log.medDose ?? '',
         ),
-      HealthKind.symptom => (
-          AppIcon.healthSymptom,
-          '症状',
-          log.symptomOther ?? '',
-        ),
+      HealthKind.symptom => () {
+          final set = HealthLogRepository.decodeSymptoms(log.symptoms);
+          final labels = [
+            for (final s in Symptom.values)
+              if (set.contains(s))
+                s == Symptom.other && (log.symptomOther?.isNotEmpty ?? false)
+                    ? log.symptomOther!
+                    : (config.copy.symptomLabels[s] ?? s.name),
+          ];
+          final title = labels.isEmpty ? '症状' : '症状 · ${labels.take(2).join('、')}${labels.length > 2 ? '…' : ''}';
+          return (AppIcon.healthSymptom, title, labels.length > 2 ? '共${labels.length}项' : '');
+        }(),
     };
   }
 

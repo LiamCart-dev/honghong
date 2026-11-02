@@ -46,3 +46,14 @@ final todayHealthLogsProvider = StreamProvider<List<HealthLog>>((ref) async* {
     return list;
   });
 });
+
+
+/// 全部未删健康记录（按 at 降序），供「全部记录」页。
+final allHealthLogsProvider = StreamProvider<List<HealthLog>>((ref) async* {
+  final baby = await ref.watch(currentBabyProvider.future);
+  final repo = ref.watch(healthLogRepositoryProvider);
+  yield* repo.watch(baby.id).map((rows) {
+    final list = [...rows]..sort((a, b) => b.at.compareTo(a.at));
+    return list;
+  });
+});
