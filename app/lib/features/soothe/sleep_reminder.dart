@@ -19,10 +19,14 @@ import '../stage/stage_copy.dart' show stageTipLine, stageTipSub;
 import '../stage/stage_tip.dart';
 import 'soothe_copy.dart';
 import 'soothe_widgets.dart';
+import '../health/health_alert_providers.dart';
 
 /// 压制哄睡提醒和结果页「开始哄睡」的来源。默认没有；以后 #28 的生病记录把自己的
 /// [SleepReminderSuppressor] 加进来即可（和 #30 的 `stageTipSuppressorsProvider` 一样）。
-final sleepReminderSuppressorsProvider = Provider<List<SleepReminderSuppressor>>((ref) => const []);
+final sleepReminderSuppressorsProvider = Provider<List<SleepReminderSuppressor>>((ref) {
+  final m = ref.watch(medicalSleepReminderSuppressorProvider);
+  return [?m];
+});
 
 /// 「还不困」：记下那次醒来的时间（= 最近一次睡眠的结束时间），本次醒着期间不再提醒。
 /// 按设备存（不跟家人同步），App 重启后仍然有效。

@@ -11,6 +11,10 @@ import '../../domain/models/cause_ui.dart';
 import '../../domain/models/cry_cause.dart';
 import '../../domain/predictor/cry_predictor.dart';
 import '../care/sleep_wake_prompt.dart';
+import '../health/health_alert_providers.dart';
+import '../health/health_providers.dart';
+import '../health/medical_banner.dart';
+import '../../domain/health/health.dart';
 import '../soothe/soothe_entry.dart';
 import '../stage/stage_tip.dart';
 import 'recording_page.dart';
@@ -31,6 +35,12 @@ class ResultPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.hh;
     final pred = ref.watch(_eventPredictionProvider(eventId));
+    final alert = ref.watch(eventMedicalAlertProvider(eventId)).value ??
+        const MedicalAlert(level: MedicalAlertLevel.none, reasons: []);
+    final config = ref.watch(healthConfigProvider);
+    final hasBanner = alert.level != MedicalAlertLevel.none;
+    final urgent = alert.isUrgent;
+
     return Scaffold(
       body: SafeArea(
         child: Stack(
@@ -42,7 +52,6 @@ class ResultPage extends ConsumerWidget {
                 data: (p) {
                   if (p == null) return const Center(child: Text('找不到这次记录'));
                   final top = p.top(3);
-                  // 只展示前三，概率按前三重新归一，和设计一致加起来是 100%
                   final sum = top.fold<double>(0, (a, s) => a + s.probability);
                   int pct(CauseScore s) => (s.probability / sum * 100).round();
                   final first = top.first;
@@ -67,6 +76,12 @@ class ResultPage extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(height: 14),
+                      if (hasBanner)
+                        MedicalBanner(
+                          alert: alert,
+                          copy: config.copy,
+                          onOpenRecords: () => context.push(Routes.logs),
+                        ),
                       HhCard(
                         padding: const EdgeInsets.all(20),
                         child: Column(
@@ -144,45 +159,65 @@ class ResultPage extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFFFE7DB), Color(0xFFFFF1E8)]),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                HhIcon(first.cause.icon, size: 44),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                      // 「请尽快就医」隐藏建议卡；「建议就医」保留（ADR-0007）
+                      if (!urgent)
+                        Container(
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [Color(0xFFFFE7DB), Color(0xFFFFF1E8)],
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
                                 children: [
-                                  Text(
-                                    '建议先试${first.cause.action}',
-                                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: c.ink),
+                                  HhIcon(first.cause.icon, size: 44),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '建议先试${first.cause.action}',
+                                          style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: c.ink),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '如果 10 分钟内没好转，再试试${second?.cause.action ?? '抱一抱'}',
+                                          style: TextStyle(fontSize: 12, color: c.sub),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text('如果 10 分钟内没好转，再试试${second?.cause.action ?? '抱一抱'}', style: TextStyle(fontSize: 12, color: c.sub)),
                                 ],
                               ),
-                            ),
-                              ],
-                            ),
-                            // 第一名是「困了」：建议卡里直接给哄睡入口（#38）
-                            if (first.cause == CryCause.sleepy) const SootheEntry(),
-                          ],
+                              // 有横幅时不给出哄睡入口（结果页按级别判断，不单靠 suppressors）
+                              if (first.cause == CryCause.sleepy && !hasBanner) const SootheEntry(),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 14),
-                      StageTipRow(eventId: eventId),
+                      if (!urgent) const SizedBox(height: 14),
+                      // 有横幅时压掉阶段提示（结果页本地判断；老快照在日志删后仍压制）
+                      if (!hasBanner) StageTipRow(eventId: eventId),
                       const SleepResultCard(),
-                      for (var i = 0; i < top.length; i++) _CauseTile(score: top[i], pct: pct(top[i]), initiallyOpen: i == 0),
+                      for (var i = 0; i < top.length; i++)
+                        _CauseTile(
+                          score: top[i],
+                          pct: pct(top[i]),
+                          initiallyOpen: !hasBanner && i == 0,
+                          redactDiaper: urgent,
+                        ),
                       const SizedBox(height: 4),
-                      HhButton(label: '宝宝不哭了，告诉我结果', primary: false, onPressed: () => context.pushReplacement(Routes.feedback(eventId))),
+                      HhButton(
+                        label: '宝宝不哭了，告诉我结果',
+                        primary: false,
+                        onPressed: () => context.pushReplacement(Routes.feedback(eventId)),
+                      ),
                       const SizedBox(height: 16),
                       Text(
                         '结果仅供参考，不能替代医生判断。若哭声异常尖锐、持续超过 2 小时或伴发烧，请及时就医。',
@@ -203,10 +238,12 @@ class ResultPage extends ConsumerWidget {
 }
 
 class _CauseTile extends StatefulWidget {
-  const _CauseTile({required this.score, required this.pct, required this.initiallyOpen});
+  const _CauseTile({required this.score, required this.pct, required this.initiallyOpen, this.redactDiaper = false});
   final CauseScore score;
   final int pct;
   final bool initiallyOpen;
+  /// 「请尽快就医」时全页不出现「尿布」字样（ADR-0007）。
+  final bool redactDiaper;
   @override
   State<_CauseTile> createState() => _CauseTileState();
 }
@@ -253,8 +290,14 @@ class _CauseTileState extends State<_CauseTile> {
             ),
             if (open) ...[
               const SizedBox(height: 8),
-              Text.rich(row('怎么判断', cause.howToTell), style: TextStyle(fontSize: 14, color: c.ink, height: 1.6)),
-              Text.rich(row('怎么安抚', cause.howToSoothe), style: TextStyle(fontSize: 14, color: c.ink, height: 1.6)),
+              Text.rich(
+                row('怎么判断', _redactDiaper(cause.howToTell, widget.redactDiaper)),
+                style: TextStyle(fontSize: 14, color: c.ink, height: 1.6),
+              ),
+              Text.rich(
+                row('怎么安抚', _redactDiaper(cause.howToSoothe, widget.redactDiaper)),
+                style: TextStyle(fontSize: 14, color: c.ink, height: 1.6),
+              ),
             ],
           ],
         ),
@@ -262,3 +305,9 @@ class _CauseTileState extends State<_CauseTile> {
     );
   }
 }
+
+String _redactDiaper(String s, bool redact) {
+  if (!redact) return s;
+  return s.replaceAll('尿布', '衣物').replaceAll('换尿布', '检查衣物');
+}
+

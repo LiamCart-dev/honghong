@@ -7,11 +7,15 @@ import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_icon.dart';
 import '../../domain/stages/cry_stage.dart';
+import '../health/health_alert_providers.dart';
 import 'stage_copy.dart';
 
 /// 压制阶段提示的来源。默认没有；以后 #28 的就医横幅把自己的 [StageTipSuppressor] 加进来即可：
 /// `stageTipSuppressorsProvider.overrideWith(...)` 或在这里返回 `[ref.watch(medicalAlertSuppressorProvider)]`。
-final stageTipSuppressorsProvider = Provider<List<StageTipSuppressor>>((ref) => const []);
+final stageTipSuppressorsProvider = Provider<List<StageTipSuppressor>>((ref) {
+  final m = ref.watch(medicalStageTipSuppressorProvider);
+  return [?m];
+});
 
 /// 某次哭声对应的阶段提示（按哭声发生那天的日龄算，所以翻看旧记录时也对得上）
 final stageTipForEventProvider = FutureProvider.autoDispose.family<StageTip?, String>((ref, eventId) async {
