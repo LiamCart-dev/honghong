@@ -20,6 +20,7 @@ import '../care/care_log_row.dart';
 import '../care/sleep_wake_prompt.dart';
 import '../diary/diary_entry_card.dart';
 import '../health/health_entry_row.dart';
+import '../health/home_medical_banner.dart';
 import '../health/health_log_row.dart';
 import '../health/health_providers.dart';
 import '../health/med_sheet.dart';
@@ -114,6 +115,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       children: [
         const _Header(),
+        const HomeMedicalBanner(),
         _StatusBar(active: active),
         // 哄睡提醒（#38）：内嵌在状态条下方，不遮挡下面的入口
         const SleepReminderCard(),

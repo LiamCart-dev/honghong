@@ -1,6 +1,7 @@
-import 'package:drift/drift.dart' show driftRuntimeOptions;
+import 'package:drift/drift.dart' show Value, driftRuntimeOptions;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:honghong/data/db/app_database.dart';
 import 'package:honghong/data/repositories/health_log_repository.dart';
 import 'package:honghong/domain/health/health_channel.dart';
 import 'package:honghong/domain/health/health_models.dart';
@@ -120,4 +121,74 @@ void main() {
       await tester.runAsync(db.close);
     }
   });
+
+
+  testWidgets('首页：请尽快就医显示横幅，建议就医不显示', (tester) async {
+    await phone(tester);
+    fixClock(tester, DateTime(2026, 11, 2, 15, 30));
+    final at = DateTime(2026, 11, 2, 15, 0);
+    final db = await pumpApp(
+      tester,
+      overrides: [
+        healthChannelProvider.overrideWithValue(HealthChannel.ci),
+      ],
+      seed: (database) async {
+        await database.into(database.babies).insert(
+              BabiesCompanion.insert(
+                id: 'b1',
+                nickname: '小米粒',
+                birthDate: DateTime(2026, 9, 20),
+              ),
+            );
+        await database.into(database.healthLogs).insert(HealthLogsCompanion.insert(
+              id: 'hl-urgent',
+              babyId: 'b1',
+              kind: HealthKind.temperature.name,
+              at: at,
+              tempC: const Value(38.3),
+              tempSite: const Value('rectal'),
+            ));
+      },
+    );
+    await settle(tester, 24);
+    expect(find.byKey(const Key('medical-banner-urgent')), findsOneWidget);
+    expect(find.byKey(const Key('medical-banner-advise')), findsNothing);
+    await unmount(tester);
+    await tester.runAsync(db.close);
+  });
+
+  testWidgets('首页：仅建议就医时不显示横幅', (tester) async {
+    await phone(tester);
+    fixClock(tester, DateTime(2026, 11, 2, 15, 30));
+    final at = DateTime(2026, 11, 2, 15, 0);
+    final db = await pumpApp(
+      tester,
+      overrides: [
+        healthChannelProvider.overrideWithValue(HealthChannel.ci),
+      ],
+      seed: (database) async {
+        await database.into(database.babies).insert(
+              BabiesCompanion.insert(
+                id: 'b1',
+                nickname: '小米粒',
+                birthDate: DateTime(2026, 1, 1),
+              ),
+            );
+        await database.into(database.healthLogs).insert(HealthLogsCompanion.insert(
+              id: 'hl-advise',
+              babyId: 'b1',
+              kind: HealthKind.temperature.name,
+              at: at,
+              tempC: const Value(37.8),
+              tempSite: const Value('armpit'),
+            ));
+      },
+    );
+    await settle(tester, 24);
+    expect(find.byKey(const Key('medical-banner-urgent')), findsNothing);
+    expect(find.byKey(const Key('medical-banner-advise')), findsNothing);
+    await unmount(tester);
+    await tester.runAsync(db.close);
+  });
+
 }
