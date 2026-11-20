@@ -7,12 +7,14 @@
 - 文件：`app/assets/models/yamnet.tflite`、`app/assets/models/yamnet_embed.tflite`。
 - 来源：[TensorFlow YAMNet](https://github.com/tensorflow/models/tree/master/research/audioset/yamnet)、[Google YAMNet 模型](https://tfhub.dev/google/yamnet/1)。
 - Copyright 2019 The TensorFlow Authors. Apache License 2.0，全文见 [third_party/licenses/Apache-2.0.txt](third_party/licenses/Apache-2.0.txt)。
-- 本项目通过 `ml/src/export_yamnet.py` 从 Google YAMNet 导出单帧得分与 embedding，并进行 TFLite 动态范围量化。转换版本保留上游许可。
+- `yamnet.tflite` 来自 TF Hub 的 `lite-model_yamnet_classification_tflite_1`；`yamnet_embed.tflite` 由本项目通过 `ml/src/export_yamnet.py` 从 Google YAMNet 导出单帧得分与 embedding，并进行 TFLite 动态范围量化。转换版本保留上游许可。
+- YAMNet 基于 [AudioSet](https://research.google.com/audioset/) 预训练；分发模型不意味着获得原始训练录音的再分发许可。
 
 ## QR Code Generator
 
 - 文件：`web/download/assets/qrcode.js`、`docs/design/download-page/assets/qrcode.js`。
-- 来源：[kazuhikoarase/qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator)。
+- 来源：[kazuhikoarase/qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator)，仓内版本 2.0.4。
+- QR Code 是 DENSO WAVE INCORPORATED 的注册商标。
 - Copyright (c) 2009 Kazuhiko Arase. MIT License，原始版权与许可全文见 [third_party/licenses/qrcode-generator-MIT.txt](third_party/licenses/qrcode-generator-MIT.txt)。文件头的上游声明须保留。
 
 ## 哭声分类头与训练数据
