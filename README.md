@@ -1,5 +1,7 @@
 # 哄哄（暂定名）
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 帮新手爸妈判断宝宝为什么哭的 App。所有判断仅供参考，不能替代医生。
 
 ## 文档
@@ -46,3 +48,7 @@ cd ml && python3 -m venv .venv && source .venv/bin/activate && pip install -r re
 ```
 
 发布与版本规则（版本号、触发条件、强制更新、签名、回滚、模型发布）：见 [docs/release.md](docs/release.md)。
+
+## 开源许可
+
+本项目原创代码采用 [MIT License](LICENSE)，允许使用、修改、分发及商业使用，须保留版权与许可声明。第三方模型、脚本、训练数据及安抚音频的许可说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)，各自遵循原许可。
